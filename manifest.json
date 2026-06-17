@@ -1,0 +1,10 @@
+{
+	"id": "notes-to-html-pages",
+	"name": "Notes to HTML Pages",
+	"version": "0.4.6",
+	"minAppVersion": "1.5.0",
+	"description": "Export Markdown notes as standalone readable HTML pages with an in-app HTML reader.",
+	"author": "Afan",
+	"authorUrl": "",
+	"isDesktopOnly": false
+}

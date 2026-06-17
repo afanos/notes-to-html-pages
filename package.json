@@ -1,0 +1,28 @@
+{
+	"name": "notes-to-html-pages",
+	"version": "0.4.6",
+	"description": "Export Markdown notes as standalone readable HTML pages with an in-app HTML reader.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+	},
+	"keywords": [
+		"obsidian",
+		"markdown",
+		"html",
+		"export"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"markdown-it": "^14.1.0"
+	},
+	"devDependencies": {
+		"@types/markdown-it": "^14.1.2",
+		"@types/node": "^22.10.2",
+		"builtin-modules": "^4.0.0",
+		"esbuild": "^0.25.0",
+		"obsidian": "latest",
+		"typescript": "^5.8.0"
+	}
+}

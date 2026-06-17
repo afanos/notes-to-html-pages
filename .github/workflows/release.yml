@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify tag
+        run: |
+          node -e "const manifest = require('./manifest.json'); if (manifest.version !== process.env.GITHUB_REF_NAME) { throw new Error('Tag must match manifest version exactly.'); }"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" main.js manifest.json \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Release $GITHUB_REF_NAME"
