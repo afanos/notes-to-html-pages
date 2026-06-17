@@ -1,5 +1,24 @@
 # Notes to HTML Pages
 
+语言：中文介绍 / 展开下方 English README
+
+## 中文介绍
+
+将 Obsidian 的 Markdown 笔记转化为清晰易读、带目录的 HTML 页面，并且可以在 Obsidian 内直接阅读。它专注于深度长文阅读，让原本拥挤的笔记内容变成更像文章、报告或小册子的阅读页面，阅读体验提升 3 倍。
+
+Notes to HTML Pages 是一个 Obsidian 插件，用来把本地 Markdown 笔记导出成清晰、素净、适合长文阅读的 HTML 页面。导出的页面不依赖外部网络，可以直接双击打开，也可以在 Obsidian 文件列表里直接点开阅读。
+
+它特别适合这些场景：
+
+- 把长笔记、调研文档、年度总结、深度文章导出成更舒服的阅读版。
+- 自动生成可点击目录，方便在长文中快速跳转。
+- 保留清晰的标题层级、引用块、重点提示、结论卡片、表格和 ASCII 图。
+- 使用纯 CSS 与内联资源，离线也能阅读和分享。
+- 在 Obsidian 内直接识别并打开 `.html` 文件，不需要离开自己的知识库。
+
+<details>
+<summary>English README</summary>
+
 Notes to HTML Pages exports Markdown notes into clean, standalone HTML pages that are easy to read offline and can also be opened directly inside Obsidian.
 
 ## Features
@@ -68,3 +87,5 @@ For Obsidian community releases, the GitHub release tag must exactly match the v
 ## License
 
 MIT
+
+</details>
