@@ -1,8 +1,14 @@
 import esbuild from "esbuild";
+import { builtinModules } from "node:module";
 import process from "node:process";
-import builtins from "builtin-modules";
 
 const prod = process.argv[2] === "production";
+const builtins = [...new Set(
+	builtinModules.flatMap((moduleName) => {
+		const normalized = moduleName.startsWith("node:") ? moduleName.slice(5) : moduleName;
+		return [normalized, `node:${normalized}`];
+	})
+)];
 const external = [
 	"obsidian",
 	"electron",
@@ -14,8 +20,7 @@ const external = [
 	"@codemirror/search",
 	"@codemirror/state",
 	"@codemirror/view",
-	...builtins,
-	...builtins.map((moduleName) => `node:${moduleName}`)
+	...builtins
 ];
 
 const context = {
