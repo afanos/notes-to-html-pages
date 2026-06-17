@@ -8,7 +8,7 @@ Notes to HTML Pages exports Markdown notes into clean, standalone HTML pages tha
 - Produces self-contained HTML with inline CSS and no network dependency.
 - Uses a restrained reading layout: narrow body, serif typography, clear headings, tables, code blocks, and blockquotes.
 - Includes the `简洁` style preset with a compact title area, clickable table of contents, right-side wide-screen navigation, simple numbered entries, red section numbers, and soft quote boxes.
-- Adds visual treatments for quotes, highlighted notes, conclusion callouts, compact tables, and code or ASCII diagram blocks.
+- Adds visual treatments for quotes, highlighted notes, conclusion callouts, stable scrolling tables, and code or ASCII diagram blocks.
 - Preserves folder structure in the export folder by default.
 - Converts wiki links toward same-name HTML pages when enabled.
 - Embeds local images as data URIs when enabled.

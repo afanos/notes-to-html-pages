@@ -460,6 +460,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 	private enhanceReadableBlocks(wrapper: Element): void {
 		this.enhanceBlockquotes(wrapper);
 		this.enhanceCodeFigures(wrapper);
+		this.enhanceTables(wrapper);
 	}
 
 	private enhanceBlockquotes(wrapper: Element): void {
@@ -512,6 +513,19 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			const text = pre.textContent ?? "";
 			pre.classList.add("code-figure");
 			pre.setAttribute("data-label", this.looksLikeAsciiFigure(text) ? "ASCII 图" : "代码");
+		});
+	}
+
+	private enhanceTables(wrapper: Element): void {
+		Array.from(wrapper.querySelectorAll("table")).forEach((table) => {
+			if (table.parentElement?.classList.contains("table-scroll")) {
+				return;
+			}
+
+			const tableScroll = table.ownerDocument.createElement("div");
+			tableScroll.className = "table-scroll";
+			table.replaceWith(tableScroll);
+			tableScroll.appendChild(table);
 		});
 	}
 
@@ -1249,16 +1263,16 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 const CLEAN_HTML_CSS = `
 :root {
 	color-scheme: light;
-	--page-bg: #fbfaf7;
-	--paper: #fffefa;
+	--page-bg: #f3f0e8;
+	--paper: #fbf8f1;
 	--ink: #20201d;
 	--muted: #77736a;
 	--line: #d8d1c6;
 	--line-soft: #ebe6dd;
 	--accent: #c7352b;
 	--accent-soft: #f8ede9;
-	--quote-bg: #fffdf8;
-	--code-bg: #f4f1eb;
+	--quote-bg: #f8f4eb;
+	--code-bg: #eee9df;
 	--link: #2f7a4b;
 }
 
@@ -1346,7 +1360,7 @@ body {
 	padding: 1.35rem 1.45rem 1.25rem;
 	border: 1px solid var(--line);
 	border-radius: 8px;
-	background: rgba(255, 254, 250, 0.82);
+	background: rgba(251, 248, 241, 0.86);
 }
 
 .table-of-contents h2 {
@@ -1552,7 +1566,7 @@ blockquote {
 	border: 0;
 	border-left: 3px solid var(--line);
 	border-radius: 6px;
-	background: rgba(255, 253, 248, 0.72);
+	background: var(--quote-bg);
 	color: #272622;
 }
 
@@ -1563,7 +1577,7 @@ blockquote.quote-block {
 blockquote.callout-block {
 	border: 1px solid var(--line);
 	border-left: 4px solid var(--accent);
-	background: #fff8f4;
+	background: #f9f2eb;
 }
 
 blockquote.callout-highlight {
@@ -1575,7 +1589,7 @@ blockquote.callout-conclusion {
 	border: 1px solid #d9cdc0;
 	border-top: 3px solid var(--accent);
 	border-left-color: #d9cdc0;
-	background: #fffdf8;
+	background: var(--paper);
 	box-shadow: 0 10px 28px rgba(70, 48, 26, 0.06);
 }
 
@@ -1624,17 +1638,21 @@ hr {
 	border-top: 1px solid var(--line-soft);
 }
 
-table {
-	display: block;
-	width: 100%;
+.table-scroll {
 	max-width: 100%;
 	margin: 1.45rem 0;
 	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--paper);
+	overflow-x: auto;
+}
+
+table {
+	width: max-content;
+	min-width: 100%;
 	border-collapse: separate;
 	border-spacing: 0;
-	border-radius: 6px;
-	background: #fffefa;
-	overflow-x: auto;
+	background: var(--paper);
 	font-size: 0.84rem;
 	line-height: 1.55;
 }
@@ -1644,7 +1662,7 @@ thead {
 }
 
 th {
-	background: #f0eee7;
+	background: #ebe6dc;
 	color: #4a463f;
 	font-weight: 700;
 	white-space: nowrap;
@@ -1669,11 +1687,11 @@ tbody tr:last-child td {
 }
 
 tbody tr:nth-child(even) {
-	background: #fbf8f1;
+	background: #f7f3ea;
 }
 
 tbody tr:hover {
-	background: #fff6ea;
+	background: #f4eadc;
 }
 
 pre,
@@ -1718,7 +1736,7 @@ pre.code-figure::before {
 
 pre.code-figure[data-label="ASCII 图"] {
 	border-left-color: var(--accent);
-	background: #f7f5ef;
+	background: #f1ece3;
 }
 
 pre.code-figure[data-label="ASCII 图"]::before {
@@ -1752,7 +1770,7 @@ sup {
 		max-height: calc(100vh - 6rem);
 		padding: 0.85rem 0.95rem;
 		border-left: 1px solid var(--line-soft);
-		background: rgba(251, 250, 247, 0.92);
+		background: rgba(243, 240, 232, 0.92);
 		overflow: auto;
 	}
 }
