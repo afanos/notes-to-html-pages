@@ -973,6 +973,12 @@ class ReadableHtmlView extends FileView {
 		);
 		this.contentEl.appendChild(iframe);
 
+		const fileHref = this.getFileHref(file.path);
+		if (fileHref) {
+			iframe.src = fileHref;
+			return;
+		}
+
 		iframe.srcdoc = this.injectBaseHref(html, this.getBaseHref(file.path));
 	}
 
@@ -1027,7 +1033,27 @@ class ReadableHtmlView extends FileView {
 			head.prepend(base);
 		}
 
+		this.preserveSrcdocFragmentLinks(document);
 		return `<!doctype html>\n${document.documentElement.outerHTML}`;
+	}
+
+	private preserveSrcdocFragmentLinks(document: Document): void {
+		document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((link) => {
+			const href = link.getAttribute("href");
+			if (href && href !== "#") {
+				link.setAttribute("href", `about:srcdoc${href}`);
+			}
+		});
+	}
+
+	private getFileHref(vaultPath: string): string | null {
+		if (!(this.app.vault.adapter instanceof FileSystemAdapter)) {
+			return null;
+		}
+
+		const basePath = normalizePath(this.app.vault.adapter.getBasePath());
+		const absolutePath = normalizePath(`${basePath}/${vaultPath}`);
+		return this.pathToFileUri(absolutePath);
 	}
 
 	private getBaseHref(vaultPath: string): string | null {
@@ -1270,11 +1296,11 @@ body {
 }
 
 .table-of-contents h2 {
-	margin: 0 0 0.95rem;
+	margin: 0 0 0.85rem;
 	padding: 0;
 	border: 0;
 	color: var(--muted);
-	font-size: 0.98rem;
+	font-size: 0.9rem;
 	font-weight: 700;
 	line-height: 1.3;
 }
@@ -1286,13 +1312,13 @@ body {
 .table-of-contents ol {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 0.45rem 1.6rem;
+	gap: 0.32rem 1.35rem;
 	margin: 0;
 	padding: 0;
 	list-style: none;
 	counter-reset: toc;
-	font-size: 0.94rem;
-	line-height: 1.6;
+	font-size: 0.86rem;
+	line-height: 1.48;
 }
 
 .table-of-contents li {
@@ -1304,10 +1330,10 @@ body {
 
 .table-of-contents a {
 	display: grid;
-	grid-template-columns: 2.2em minmax(0, 1fr);
-	gap: 0.35rem;
+	grid-template-columns: 1.9em minmax(0, 1fr);
+	gap: 0.3rem;
 	margin: 0 -0.35rem;
-	padding: 0.12rem 0.35rem;
+	padding: 0.1rem 0.35rem;
 	border-radius: 5px;
 	color: var(--ink);
 	text-decoration: none;
@@ -1316,8 +1342,9 @@ body {
 }
 
 .table-of-contents a::before {
-	content: counter(toc, cjk-ideographic);
+	content: counter(toc) ".";
 	color: var(--muted);
+	text-align: right;
 	transition: color 160ms ease;
 }
 
@@ -1339,7 +1366,7 @@ body {
 .side-toc-title {
 	margin: 0 0 0.75rem;
 	color: var(--muted);
-	font-size: 0.78rem;
+	font-size: 0.72rem;
 	font-weight: 700;
 	text-transform: uppercase;
 }
@@ -1349,8 +1376,8 @@ body {
 	padding: 0;
 	list-style: none;
 	counter-reset: side-toc;
-	font-size: 0.82rem;
-	line-height: 1.45;
+	font-size: 0.76rem;
+	line-height: 1.36;
 }
 
 .side-table-of-contents li {
@@ -1361,10 +1388,10 @@ body {
 
 .side-table-of-contents a {
 	display: grid;
-	grid-template-columns: 1.7em minmax(0, 1fr);
-	gap: 0.35rem;
+	grid-template-columns: 2em minmax(0, 1fr);
+	gap: 0.28rem;
 	margin: 0 -0.35rem;
-	padding: 0.28rem 0.35rem;
+	padding: 0.22rem 0.35rem;
 	border-radius: 5px;
 	color: var(--muted);
 	text-decoration: none;
@@ -1373,8 +1400,9 @@ body {
 }
 
 .side-table-of-contents a::before {
-	content: counter(side-toc, cjk-ideographic);
+	content: counter(side-toc) ".";
 	color: #aaa39a;
+	text-align: right;
 	transition: color 160ms ease;
 }
 
