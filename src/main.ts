@@ -342,6 +342,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		this.removeLeadingHr(wrapper);
 		this.removeLeadingManualToc(wrapper);
 		this.normalizeSectionHeadings(wrapper);
+		this.enhanceReadableBlocks(wrapper);
 		const toc = this.createAutoToc(wrapper);
 
 		return [
@@ -454,6 +455,75 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 				heading.textContent = cleanText;
 			}
 		});
+	}
+
+	private enhanceReadableBlocks(wrapper: Element): void {
+		this.enhanceBlockquotes(wrapper);
+		this.enhanceCodeFigures(wrapper);
+	}
+
+	private enhanceBlockquotes(wrapper: Element): void {
+		Array.from(wrapper.querySelectorAll("blockquote")).forEach((blockquote) => {
+			const label = this.getBlockquoteLabel(blockquote);
+			const text = blockquote.textContent?.trim() ?? "";
+			const kind = this.getBlockquoteKind(label, text);
+
+			blockquote.classList.add("readable-blockquote");
+			if (label) {
+				blockquote.setAttribute("data-label", label);
+			}
+
+			if (kind === "conclusion") {
+				blockquote.classList.add("callout-block", "callout-conclusion");
+			} else if (kind === "highlight") {
+				blockquote.classList.add("callout-block", "callout-highlight");
+			} else {
+				blockquote.classList.add("quote-block");
+			}
+		});
+	}
+
+	private getBlockquoteLabel(blockquote: Element): string {
+		const firstStrong =
+			blockquote.querySelector("p:first-child strong:first-child") ??
+			blockquote.querySelector("strong:first-child");
+		return firstStrong?.textContent?.trim() ?? "";
+	}
+
+	private getBlockquoteKind(label: string, text: string): "quote" | "highlight" | "conclusion" {
+		const signature = `${label} ${text.slice(0, 80)}`.toLowerCase();
+		if (/(结论|总结|小结|结语|最终判断|takeaway|conclusion|summary|final)/i.test(signature)) {
+			return "conclusion";
+		}
+
+		if (
+			/(重点|要点|提示|注意|关键|核心|观察|洞察|提醒|important|note|tip|warning|info|insight)/i.test(
+				signature
+			)
+		) {
+			return "highlight";
+		}
+
+		return "quote";
+	}
+
+	private enhanceCodeFigures(wrapper: Element): void {
+		Array.from(wrapper.querySelectorAll("pre")).forEach((pre) => {
+			const text = pre.textContent ?? "";
+			pre.classList.add("code-figure");
+			pre.setAttribute("data-label", this.looksLikeAsciiFigure(text) ? "ASCII 图" : "代码");
+		});
+	}
+
+	private looksLikeAsciiFigure(text: string): boolean {
+		const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+		if (lines.length < 3) {
+			return false;
+		}
+
+		return /[┌┐└┘├┤┬┴┼│─━┃╭╮╰╯→←↑↓▼▲]|(?:-{2,}>|={2,}>|\|[\s\S]*\||\+-{2,}\+)/.test(
+			text
+		);
 	}
 
 	private getFirstContentElement(wrapper: Element): Element | null {
@@ -1476,12 +1546,37 @@ em {
 }
 
 blockquote {
+	position: relative;
 	margin: 1.55rem 0;
-	padding: 0.95rem 1.2rem;
-	border: 1px solid var(--line);
+	padding: 0.95rem 1.15rem 0.95rem 1.25rem;
+	border: 0;
+	border-left: 3px solid var(--line);
 	border-radius: 6px;
-	background: var(--quote-bg);
+	background: rgba(255, 253, 248, 0.72);
 	color: #272622;
+}
+
+blockquote.quote-block {
+	color: #3c3932;
+}
+
+blockquote.callout-block {
+	border: 1px solid var(--line);
+	border-left: 4px solid var(--accent);
+	background: #fff8f4;
+}
+
+blockquote.callout-highlight {
+	box-shadow: inset 0 0 0 1px rgba(199, 53, 43, 0.05);
+}
+
+blockquote.callout-conclusion {
+	padding: 1.05rem 1.25rem;
+	border: 1px solid #d9cdc0;
+	border-top: 3px solid var(--accent);
+	border-left-color: #d9cdc0;
+	background: #fffdf8;
+	box-shadow: 0 10px 28px rgba(70, 48, 26, 0.06);
 }
 
 blockquote p:first-child {
@@ -1494,6 +1589,17 @@ blockquote p:last-child {
 
 blockquote strong {
 	color: var(--accent);
+}
+
+blockquote.callout-block p:first-child strong:first-child {
+	display: inline-block;
+	margin-bottom: 0.25rem;
+	padding: 0.06rem 0.42rem;
+	border-radius: 999px;
+	background: var(--accent-soft);
+	color: var(--accent);
+	font-size: 0.78rem;
+	line-height: 1.45;
 }
 
 ul,
@@ -1521,27 +1627,53 @@ hr {
 table {
 	display: block;
 	width: 100%;
+	max-width: 100%;
 	margin: 1.45rem 0;
-	border-collapse: collapse;
+	border: 1px solid var(--line);
+	border-collapse: separate;
+	border-spacing: 0;
+	border-radius: 6px;
+	background: #fffefa;
 	overflow-x: auto;
-	font-size: 0.9rem;
-	line-height: 1.65;
+	font-size: 0.84rem;
+	line-height: 1.55;
 }
 
 thead {
+	background: transparent;
+}
+
+th {
 	background: #f0eee7;
+	color: #4a463f;
+	font-weight: 700;
+	white-space: nowrap;
 }
 
 th,
 td {
-	padding: 0.68rem 0.78rem;
-	border: 1px solid var(--line);
+	padding: 0.55rem 0.66rem;
+	border: 0;
+	border-right: 1px solid var(--line);
+	border-bottom: 1px solid var(--line);
 	text-align: left;
 	vertical-align: top;
 }
 
+tr > :last-child {
+	border-right: 0;
+}
+
+tbody tr:last-child td {
+	border-bottom: 0;
+}
+
 tbody tr:nth-child(even) {
-	background: #fffdf8;
+	background: #fbf8f1;
+}
+
+tbody tr:hover {
+	background: #fff6ea;
 }
 
 pre,
@@ -1557,13 +1689,40 @@ code {
 }
 
 pre {
-	margin: 1.35rem 0;
-	padding: 0.95rem 1rem;
+	position: relative;
+	margin: 1.6rem 0;
+	padding: 2rem 1rem 1rem;
 	border: 1px solid var(--line);
+	border-left: 4px solid #bbb3a8;
 	border-radius: 6px;
 	background: var(--code-bg);
 	overflow-x: auto;
 	line-height: 1.5;
+}
+
+pre::before {
+	content: "代码 / 图示";
+	position: absolute;
+	top: 0.55rem;
+	left: 0.9rem;
+	color: var(--muted);
+	font-family: Georgia, "Times New Roman", "Noto Serif SC", "Songti SC", SimSun, serif;
+	font-size: 0.72rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+pre.code-figure::before {
+	content: attr(data-label);
+}
+
+pre.code-figure[data-label="ASCII 图"] {
+	border-left-color: var(--accent);
+	background: #f7f5ef;
+}
+
+pre.code-figure[data-label="ASCII 图"]::before {
+	color: var(--accent);
 }
 
 pre code {
