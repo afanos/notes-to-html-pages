@@ -18,12 +18,114 @@ import {
 const VIEW_TYPE_READABLE_HTML = "notes-to-html-pages-html-view";
 
 type HtmlStylePreset = "clean";
+type UiLanguage = "zh" | "en";
 
-const HTML_STYLE_OPTIONS: Record<HtmlStylePreset, string> = {
-	clean: "简洁"
+const HTML_STYLE_OPTIONS: Record<HtmlStylePreset, Record<UiLanguage, string>> = {
+	clean: {
+		zh: "简洁",
+		en: "Clean"
+	}
+};
+
+const UI_TEXT: Record<UiLanguage, Record<string, string>> = {
+	zh: {
+		ribbonExportCurrentNote: "导出当前笔记为 HTML 页面",
+		commandExportCurrentNote: "导出当前笔记为 HTML 页面",
+		commandExportCurrentFolder: "导出当前文件夹为 HTML 页面",
+		menuExportNote: "导出为 HTML 页面",
+		menuExportFolder: "导出文件夹为 HTML 页面",
+		noticeNoActiveMarkdown: "当前没有打开 Markdown 笔记。",
+		noticeNoMarkdownInFolder: "这个文件夹里没有可导出的 Markdown 笔记。",
+		noticeFolderExported: "已导出 {count} 篇笔记为 HTML 页面。",
+		noticeFileExported: "已导出：{path}",
+		noticeExportFailed: "导出失败：{path}",
+		noticeReloadRequired: "重启 Obsidian 或重新加载插件后，命令名和侧边栏按钮会更新。",
+		untitledSection: "未命名章节",
+		toc: "目录",
+		sectionTocAria: "章节目录",
+		codeLabel: "代码",
+		asciiFigureLabel: "ASCII 图",
+		fallbackHtmlPage: "HTML 页面",
+		launcherOpenInBrowser: "在浏览器打开 HTML 页面",
+		launcherHtmlFile: "HTML 文件",
+		launcherSourceNote: "源笔记",
+		sourceLinkLabel: "HTML 页面",
+		sourceLinkAlias: "打开 HTML 页面",
+		settingsTitle: "Notes to HTML Pages",
+		settingLanguageName: "界面语言",
+		settingLanguageDesc: "切换插件命令、右键菜单、设置页和提示文案。命令名需要重载插件后刷新。",
+		languageChinese: "中文",
+		languageEnglish: "English",
+		settingExportFolderName: "导出目录",
+		settingExportFolderDesc: "相对于当前 vault 根目录。",
+		settingStyleName: "HTML 样式",
+		settingStyleDesc: "控制导出的 HTML 页面版式。后续新增样式会出现在这里。",
+		settingPreserveFoldersName: "保留原文件夹层级",
+		settingPreserveFoldersDesc: "开启后，导出的 HTML 会在导出目录里复刻原笔记的文件夹路径。",
+		settingAddTitleName: "没有 H1 时用文件名补标题",
+		settingAddTitleDesc: "让导出的页面始终有一个居中的主标题。",
+		settingWikilinksName: "将 Wikilink 指向同名 HTML",
+		settingWikilinksDesc: "例如 [[长文]] 会导出为指向 长文.html 的链接。",
+		settingOpenHtmlName: "在 Obsidian 内直接打开 HTML",
+		settingOpenHtmlDesc: "注册 .html/.htm 文件视图。开启后，导出的 HTML 会出现在文件列表中，并可直接点开阅读。",
+		settingLauncherName: "生成 Obsidian 可见入口笔记",
+		settingLauncherDesc: "兼容旧方案：同时生成同名 .md 入口笔记。已开启 HTML 直接阅读时通常不需要。",
+		settingInsertLinkName: "在原文开头插入阅读版双链",
+		settingInsertLinkDesc: "导出后，在原文开头放入指向入口笔记的双链。再次导出会自动更新，不会重复添加。",
+		settingEmbedImagesName: "内嵌本地图片",
+		settingEmbedImagesDesc: "把本地图片转为 data URI，方便 HTML 文件独立打开。"
+	},
+	en: {
+		ribbonExportCurrentNote: "Export current note to HTML page",
+		commandExportCurrentNote: "Export current note to HTML page",
+		commandExportCurrentFolder: "Export current folder to HTML pages",
+		menuExportNote: "Export to HTML page",
+		menuExportFolder: "Export folder to HTML pages",
+		noticeNoActiveMarkdown: "No Markdown note is currently open.",
+		noticeNoMarkdownInFolder: "This folder does not contain Markdown notes to export.",
+		noticeFolderExported: "Exported {count} notes to HTML pages.",
+		noticeFileExported: "Exported: {path}",
+		noticeExportFailed: "Export failed: {path}",
+		noticeReloadRequired: "Reload Obsidian or reload the plugin to refresh command names and the ribbon button.",
+		untitledSection: "Untitled section",
+		toc: "Table of contents",
+		sectionTocAria: "Section table of contents",
+		codeLabel: "Code",
+		asciiFigureLabel: "ASCII diagram",
+		fallbackHtmlPage: "HTML Page",
+		launcherOpenInBrowser: "Open HTML page in browser",
+		launcherHtmlFile: "HTML file",
+		launcherSourceNote: "Source note",
+		sourceLinkLabel: "HTML Page",
+		sourceLinkAlias: "Open HTML Page",
+		settingsTitle: "Notes to HTML Pages",
+		settingLanguageName: "Interface language",
+		settingLanguageDesc: "Switch plugin commands, context menus, settings, and notices. Command names refresh after reloading the plugin.",
+		languageChinese: "中文",
+		languageEnglish: "English",
+		settingExportFolderName: "Export folder",
+		settingExportFolderDesc: "Relative to the current vault root.",
+		settingStyleName: "HTML style",
+		settingStyleDesc: "Controls the exported HTML page layout. Future styles will appear here.",
+		settingPreserveFoldersName: "Preserve folder structure",
+		settingPreserveFoldersDesc: "Exports HTML pages into matching subfolders inside the export folder.",
+		settingAddTitleName: "Use filename as title when H1 is missing",
+		settingAddTitleDesc: "Ensures every exported page has a centered main title.",
+		settingWikilinksName: "Point Wikilinks to same-name HTML",
+		settingWikilinksDesc: "For example, [[Long note]] will link to Long note.html.",
+		settingOpenHtmlName: "Open HTML directly in Obsidian",
+		settingOpenHtmlDesc: "Registers a .html/.htm file view so exported HTML files appear in the file explorer and open inside Obsidian.",
+		settingLauncherName: "Create Obsidian-visible launcher notes",
+		settingLauncherDesc: "Legacy compatibility: also create a same-name .md launcher note. Usually unnecessary when direct HTML reading is enabled.",
+		settingInsertLinkName: "Insert HTML backlink at source note top",
+		settingInsertLinkDesc: "After export, insert a backlink to the generated reading page at the top of the source note. Re-exporting updates it without duplicates.",
+		settingEmbedImagesName: "Embed local images",
+		settingEmbedImagesDesc: "Converts local images to data URIs so the HTML file can be opened standalone."
+	}
 };
 
 interface ReadableHtmlSettings {
+	interfaceLanguage: UiLanguage;
 	exportFolder: string;
 	stylePreset: HtmlStylePreset;
 	preserveFolderStructure: boolean;
@@ -36,6 +138,7 @@ interface ReadableHtmlSettings {
 }
 
 const DEFAULT_SETTINGS: ReadableHtmlSettings = {
+	interfaceLanguage: "zh",
 	exportFolder: "HTML Pages",
 	stylePreset: "clean",
 	preserveFolderStructure: true,
@@ -48,7 +151,7 @@ const DEFAULT_SETTINGS: ReadableHtmlSettings = {
 };
 
 const SOURCE_LINK_BLOCK_REGEX =
-	/(?:%% readable-html-exporter-link:start %%\r?\n)?^> (?:阅读版 HTML|HTML 页面)：\[\[[^\]]+\|(?:打开对应 HTML|打开 HTML 页面)\]\]\s*\r?\n(?:%% readable-html-exporter-link:end %%\r?\n?)?/gm;
+	/(?:%% readable-html-exporter-link:start %%\r?\n)?^> (?:阅读版 HTML|HTML 页面|Readable HTML|HTML Page)\s*[：:]\s*\[\[[^\]]+\|(?:打开对应 HTML|打开 HTML 页面|Open HTML|Open HTML Page)\]\]\s*\r?\n(?:%% readable-html-exporter-link:end %%\r?\n?)?/gm;
 
 interface ExportPaths {
 	htmlPath: string;
@@ -77,13 +180,13 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			}
 		}
 
-		this.addRibbonIcon("file-output", "导出当前笔记为 HTML 页面", () => {
+		this.addRibbonIcon("file-output", this.t("ribbonExportCurrentNote"), () => {
 			void this.exportActiveFile();
 		});
 
 		this.addCommand({
 			id: "export-current-note-readable-html",
-			name: "导出当前笔记为 HTML 页面",
+			name: this.t("commandExportCurrentNote"),
 			checkCallback: (checking) => {
 				const file = this.getActiveMarkdownFile();
 				if (!file) return false;
@@ -97,7 +200,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 
 		this.addCommand({
 			id: "export-current-folder-readable-html",
-			name: "导出当前文件夹为 HTML 页面",
+			name: this.t("commandExportCurrentFolder"),
 			checkCallback: (checking) => {
 				const file = this.getActiveMarkdownFile();
 				const folder = file?.parent;
@@ -115,7 +218,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 				if (file instanceof TFile && file.extension === "md") {
 					menu.addItem((item) => {
 						item
-							.setTitle("导出为 HTML 页面")
+							.setTitle(this.t("menuExportNote"))
 							.setIcon("file-output")
 							.onClick(() => void this.exportFile(file, true));
 					});
@@ -124,7 +227,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 				if (file instanceof TFolder) {
 					menu.addItem((item) => {
 						item
-							.setTitle("导出文件夹为 HTML 页面")
+							.setTitle(this.t("menuExportFolder"))
 							.setIcon("folder-output")
 							.onClick(() => void this.exportFolder(file));
 					});
@@ -141,6 +244,29 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
+	}
+
+	getInterfaceLanguage(): UiLanguage {
+		return this.settings.interfaceLanguage === "en" ? "en" : "zh";
+	}
+
+	t(key: keyof typeof UI_TEXT.zh, vars: Record<string, string | number> = {}): string {
+		const language = this.getInterfaceLanguage();
+		const template = UI_TEXT[language][key] ?? UI_TEXT.zh[key] ?? key;
+		return template.replace(/\{(\w+)}/g, (_, name: string) => String(vars[name] ?? ""));
+	}
+
+	tForLanguage(
+		language: UiLanguage,
+		key: keyof typeof UI_TEXT.zh,
+		vars: Record<string, string | number> = {}
+	): string {
+		const template = UI_TEXT[language][key] ?? UI_TEXT.zh[key] ?? key;
+		return template.replace(/\{(\w+)}/g, (_, name: string) => String(vars[name] ?? ""));
+	}
+
+	getStyleLabel(stylePreset: HtmlStylePreset, language = this.getInterfaceLanguage()): string {
+		return HTML_STYLE_OPTIONS[stylePreset]?.[language] ?? stylePreset;
 	}
 
 	private createMarkdownRenderer(): MarkdownIt {
@@ -194,7 +320,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 	private async exportActiveFile(): Promise<void> {
 		const file = this.getActiveMarkdownFile();
 		if (!file) {
-			new Notice("当前没有打开 Markdown 笔记。");
+			new Notice(this.t("noticeNoActiveMarkdown"));
 			return;
 		}
 
@@ -207,7 +333,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		);
 
 		if (files.length === 0) {
-			new Notice("这个文件夹里没有可导出的 Markdown 笔记。");
+			new Notice(this.t("noticeNoMarkdownInFolder"));
 			return;
 		}
 
@@ -217,7 +343,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			successCount += 1;
 		}
 
-			new Notice(`已导出 ${successCount} 篇笔记为 HTML 页面。`);
+			new Notice(this.t("noticeFolderExported", { count: successCount }));
 	}
 
 	private collectMarkdownFiles(folder: TFolder): TFile[] {
@@ -256,11 +382,11 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			}
 
 			if (showNotice) {
-				new Notice(`已导出：${paths.htmlPath}`);
+				new Notice(this.t("noticeFileExported", { path: paths.htmlPath }));
 			}
 		} catch (error) {
 			console.error(error);
-			new Notice(`导出失败：${file.path}`);
+			new Notice(this.t("noticeExportFailed", { path: file.path }));
 		}
 	}
 
@@ -275,8 +401,9 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		const markdown = shouldAddTitle ? `# ${title}\n\n${prepared}` : prepared;
 		const stylePreset = this.getStylePreset();
 		const renderedBody = this.markdown.render(markdown, {});
-		const body = this.buildStyledBody(renderedBody, title, stylePreset);
-		const lang = /[\u3400-\u9fff]/.test(raw) ? "zh-CN" : "en";
+		const documentLanguage: UiLanguage = /[\u3400-\u9fff]/.test(raw) ? "zh" : "en";
+		const body = this.buildStyledBody(renderedBody, title, stylePreset, documentLanguage);
+		const lang = documentLanguage === "zh" ? "zh-CN" : "en";
 
 		return {
 			title,
@@ -316,7 +443,8 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 	private buildStyledBody(
 		renderedHtml: string,
 		fallbackTitle: string,
-		stylePreset: HtmlStylePreset
+		stylePreset: HtmlStylePreset,
+		documentLanguage: UiLanguage
 	): string {
 		if (stylePreset !== "clean" || typeof DOMParser === "undefined") {
 			return `<article class="article-body">${renderedHtml}</article>`;
@@ -342,8 +470,8 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		this.removeLeadingHr(wrapper);
 		this.removeLeadingManualToc(wrapper);
 		this.normalizeSectionHeadings(wrapper);
-		this.enhanceReadableBlocks(wrapper);
-		const toc = this.createAutoToc(wrapper);
+		this.enhanceReadableBlocks(wrapper, documentLanguage);
+		const toc = this.createAutoToc(wrapper, documentLanguage);
 
 		return [
 			this.createArticleHero(title, deckHtml),
@@ -383,7 +511,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		return { primary: title, secondary: null };
 	}
 
-	private createAutoToc(wrapper: Element): string {
+	private createAutoToc(wrapper: Element, documentLanguage: UiLanguage): string {
 		const headings = Array.from(wrapper.querySelectorAll("h2")).filter(
 			(heading) => !this.isTocHeading(heading)
 		);
@@ -394,7 +522,9 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 
 		const usedIds = new Map<string, number>();
 		const items = headings.map((heading) => {
-			const text = heading.textContent?.trim() || "未命名章节";
+			const text =
+				heading.textContent?.trim() ||
+				this.tForLanguage(documentLanguage, "untitledSection");
 			const existingId = heading.getAttribute("id");
 			const id = existingId || this.createUniqueHeadingId(text, usedIds);
 			heading.setAttribute("id", id);
@@ -404,15 +534,18 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			)}</a></li>`;
 		});
 
+		const tocLabel = this.tForLanguage(documentLanguage, "toc");
+		const sectionTocLabel = this.tForLanguage(documentLanguage, "sectionTocAria");
+
 		return [
-			'<nav class="table-of-contents" aria-label="目录">',
-			"<h2>目录</h2>",
+			`<nav class="table-of-contents" aria-label="${this.escapeHtml(tocLabel)}">`,
+			`<h2>${this.escapeHtml(tocLabel)}</h2>`,
 			"<ol>",
 			items.join("\n"),
 			"</ol>",
 			"</nav>",
-			'<aside class="side-table-of-contents" aria-label="章节目录">',
-			'<div class="side-toc-title">目录</div>',
+			`<aside class="side-table-of-contents" aria-label="${this.escapeHtml(sectionTocLabel)}">`,
+			`<div class="side-toc-title">${this.escapeHtml(tocLabel)}</div>`,
 			"<ol>",
 			items.join("\n"),
 			"</ol>",
@@ -457,9 +590,9 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		});
 	}
 
-	private enhanceReadableBlocks(wrapper: Element): void {
+	private enhanceReadableBlocks(wrapper: Element, documentLanguage: UiLanguage): void {
 		this.enhanceBlockquotes(wrapper);
-		this.enhanceCodeFigures(wrapper);
+		this.enhanceCodeFigures(wrapper, documentLanguage);
 		this.enhanceTables(wrapper);
 	}
 
@@ -508,11 +641,20 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		return "quote";
 	}
 
-	private enhanceCodeFigures(wrapper: Element): void {
+	private enhanceCodeFigures(wrapper: Element, documentLanguage: UiLanguage): void {
 		Array.from(wrapper.querySelectorAll("pre")).forEach((pre) => {
 			const text = pre.textContent ?? "";
+			const isAsciiFigure = this.looksLikeAsciiFigure(text);
 			pre.classList.add("code-figure");
-			pre.setAttribute("data-label", this.looksLikeAsciiFigure(text) ? "ASCII 图" : "代码");
+			if (isAsciiFigure) {
+				pre.classList.add("ascii-figure");
+			}
+			pre.setAttribute(
+				"data-label",
+				isAsciiFigure
+					? this.tForLanguage(documentLanguage, "asciiFigureLabel")
+					: this.tForLanguage(documentLanguage, "codeLabel")
+			);
 		});
 	}
 
@@ -835,18 +977,20 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			"",
 			`# ${this.escapeMarkdownHeading(title)}`,
 			"",
-			`[在浏览器打开 HTML 页面](${htmlUri})`,
+			`[${this.t("launcherOpenInBrowser")}](${htmlUri})`,
 			"",
-			`HTML 文件：\`${paths.htmlFileName}\``,
+			`${this.t("launcherHtmlFile")}：\`${paths.htmlFileName}\``,
 			"",
-			`源笔记：[[${sourceTarget}|${this.escapeMarkdownText(file.basename)}]]`
+			`${this.t("launcherSourceNote")}：[[${sourceTarget}|${this.escapeMarkdownText(file.basename)}]]`
 		].join("\n");
 	}
 
 	private async upsertSourceLink(file: TFile, launcherWikiTarget: string): Promise<void> {
 		const raw = await this.app.vault.read(file);
 		const withoutOldLink = this.removeSourceLinkBlock(raw);
-		const linkBlock = `> HTML 页面：[[${launcherWikiTarget}|打开 HTML 页面]]`;
+		const linkBlock = `> ${this.t("sourceLinkLabel")}: [[${launcherWikiTarget}|${this.t(
+			"sourceLinkAlias"
+		)}]]`;
 		const updated = this.insertAfterFrontmatter(withoutOldLink, linkBlock);
 
 		if (updated !== raw) {
@@ -1002,7 +1146,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 	}
 
 	private escapeMarkdownHeading(text: string): string {
-		return text.replace(/\r?\n/g, " ").trim() || "HTML 页面";
+		return text.replace(/\r?\n/g, " ").trim() || this.t("fallbackHtmlPage");
 	}
 
 	private escapeYamlValue(text: string): string {
@@ -1156,11 +1300,27 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Notes to HTML Pages" });
+		containerEl.createEl("h2", { text: this.plugin.t("settingsTitle") });
 
 		new Setting(containerEl)
-			.setName("导出目录")
-			.setDesc("相对于当前 vault 根目录。")
+			.setName(this.plugin.t("settingLanguageName"))
+			.setDesc(this.plugin.t("settingLanguageDesc"))
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("zh", this.plugin.t("languageChinese"))
+					.addOption("en", this.plugin.t("languageEnglish"))
+					.setValue(this.plugin.getInterfaceLanguage())
+					.onChange(async (value) => {
+						this.plugin.settings.interfaceLanguage = value === "en" ? "en" : "zh";
+						await this.plugin.saveSettings();
+						new Notice(this.plugin.t("noticeReloadRequired"));
+						this.display();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName(this.plugin.t("settingExportFolderName"))
+			.setDesc(this.plugin.t("settingExportFolderDesc"))
 			.addText((text) =>
 				text
 					.setPlaceholder("HTML Pages")
@@ -1172,11 +1332,14 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("HTML 样式")
-			.setDesc("控制导出的 HTML 页面版式。后续新增样式会出现在这里。")
+			.setName(this.plugin.t("settingStyleName"))
+			.setDesc(this.plugin.t("settingStyleDesc"))
 			.addDropdown((dropdown) => {
-				Object.entries(HTML_STYLE_OPTIONS).forEach(([value, label]) => {
-					dropdown.addOption(value, label);
+				Object.keys(HTML_STYLE_OPTIONS).forEach((value) => {
+					dropdown.addOption(
+						value,
+						this.plugin.getStyleLabel(value as HtmlStylePreset)
+					);
 				});
 
 				dropdown.setValue(this.plugin.settings.stylePreset).onChange(async (value) => {
@@ -1186,8 +1349,8 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName("保留原文件夹层级")
-			.setDesc("开启后，导出的 HTML 会在导出目录里复刻原笔记的文件夹路径。")
+			.setName(this.plugin.t("settingPreserveFoldersName"))
+			.setDesc(this.plugin.t("settingPreserveFoldersDesc"))
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.preserveFolderStructure)
@@ -1198,8 +1361,8 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("没有 H1 时用文件名补标题")
-			.setDesc("让导出的页面始终有一个居中的主标题。")
+			.setName(this.plugin.t("settingAddTitleName"))
+			.setDesc(this.plugin.t("settingAddTitleDesc"))
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.addTitleFromFilename).onChange(async (value) => {
 					this.plugin.settings.addTitleFromFilename = value;
@@ -1208,29 +1371,29 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("将 Wikilink 指向同名 HTML")
-			.setDesc("例如 [[长文]] 会导出为指向 长文.html 的链接。")
+			.setName(this.plugin.t("settingWikilinksName"))
+			.setDesc(this.plugin.t("settingWikilinksDesc"))
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.linkWikilinksToHtml).onChange(async (value) => {
 					this.plugin.settings.linkWikilinksToHtml = value;
 					await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("在 Obsidian 内直接打开 HTML")
-			.setDesc("注册 .html/.htm 文件视图。开启后，导出的 HTML 会出现在文件列表中，并可直接点开阅读。")
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.openHtmlInObsidian).onChange(async (value) => {
-					this.plugin.settings.openHtmlInObsidian = value;
-					await this.plugin.saveSettings();
-					new Notice("重启 Obsidian 或重新加载插件后生效。");
 				})
 			);
 
 		new Setting(containerEl)
-			.setName("生成 Obsidian 可见入口笔记")
-			.setDesc("兼容旧方案：同时生成同名 .md 入口笔记。已开启 HTML 直接阅读时通常不需要。")
+			.setName(this.plugin.t("settingOpenHtmlName"))
+			.setDesc(this.plugin.t("settingOpenHtmlDesc"))
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.openHtmlInObsidian).onChange(async (value) => {
+					this.plugin.settings.openHtmlInObsidian = value;
+					await this.plugin.saveSettings();
+					new Notice(this.plugin.t("noticeReloadRequired"));
+				})
+			);
+
+		new Setting(containerEl)
+			.setName(this.plugin.t("settingLauncherName"))
+			.setDesc(this.plugin.t("settingLauncherDesc"))
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.createLauncherNote).onChange(async (value) => {
 					this.plugin.settings.createLauncherNote = value;
@@ -1239,8 +1402,8 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("在原文开头插入阅读版双链")
-			.setDesc("导出后，在原文开头放入指向入口笔记的双链。再次导出会自动更新，不会重复添加。")
+			.setName(this.plugin.t("settingInsertLinkName"))
+			.setDesc(this.plugin.t("settingInsertLinkDesc"))
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.insertLinkInSource).onChange(async (value) => {
 					this.plugin.settings.insertLinkInSource = value;
@@ -1249,8 +1412,8 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("内嵌本地图片")
-			.setDesc("把本地图片转为 data URI，方便 HTML 文件独立打开。")
+			.setName(this.plugin.t("settingEmbedImagesName"))
+			.setDesc(this.plugin.t("settingEmbedImagesDesc"))
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.embedLocalImages).onChange(async (value) => {
 					this.plugin.settings.embedLocalImages = value;
@@ -1734,12 +1897,12 @@ pre.code-figure::before {
 	content: attr(data-label);
 }
 
-pre.code-figure[data-label="ASCII 图"] {
+pre.code-figure.ascii-figure {
 	border-left-color: var(--accent);
 	background: #f1ece3;
 }
 
-pre.code-figure[data-label="ASCII 图"]::before {
+pre.code-figure.ascii-figure::before {
 	color: var(--accent);
 }
 
