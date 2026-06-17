@@ -153,6 +153,8 @@ const DEFAULT_SETTINGS: ReadableHtmlSettings = {
 const SOURCE_LINK_BLOCK_REGEX =
 	/(?:%% readable-html-exporter-link:start %%\r?\n)?^> (?:阅读版 HTML|HTML 页面|Readable HTML|HTML Page)\s*[：:]\s*\[\[[^\]]+\|(?:打开对应 HTML|打开 HTML 页面|Open HTML|Open HTML Page)\]\]\s*\r?\n(?:%% readable-html-exporter-link:end %%\r?\n?)?/gm;
 
+const INVALID_FILE_NAME_CHARS = new Set(['<', '>', ':', '"', '/', "\\", "|", "?", "*"]);
+
 interface ExportPaths {
 	htmlPath: string;
 	launcherPath: string;
@@ -239,7 +241,53 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const loadedData: unknown = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, this.normalizeLoadedSettings(loadedData));
+	}
+
+	private normalizeLoadedSettings(data: unknown): Partial<ReadableHtmlSettings> {
+		if (!this.isRecord(data)) {
+			return {};
+		}
+
+		const settings: Partial<ReadableHtmlSettings> = {};
+
+		if (data.interfaceLanguage === "zh" || data.interfaceLanguage === "en") {
+			settings.interfaceLanguage = data.interfaceLanguage;
+		}
+		if (typeof data.exportFolder === "string") {
+			settings.exportFolder = data.exportFolder;
+		}
+		if (data.stylePreset === "clean") {
+			settings.stylePreset = data.stylePreset;
+		}
+		if (typeof data.preserveFolderStructure === "boolean") {
+			settings.preserveFolderStructure = data.preserveFolderStructure;
+		}
+		if (typeof data.addTitleFromFilename === "boolean") {
+			settings.addTitleFromFilename = data.addTitleFromFilename;
+		}
+		if (typeof data.linkWikilinksToHtml === "boolean") {
+			settings.linkWikilinksToHtml = data.linkWikilinksToHtml;
+		}
+		if (typeof data.embedLocalImages === "boolean") {
+			settings.embedLocalImages = data.embedLocalImages;
+		}
+		if (typeof data.openHtmlInObsidian === "boolean") {
+			settings.openHtmlInObsidian = data.openHtmlInObsidian;
+		}
+		if (typeof data.createLauncherNote === "boolean") {
+			settings.createLauncherNote = data.createLauncherNote;
+		}
+		if (typeof data.insertLinkInSource === "boolean") {
+			settings.insertLinkInSource = data.insertLinkInSource;
+		}
+
+		return settings;
+	}
+
+	private isRecord(value: unknown): value is Record<string, unknown> {
+		return typeof value === "object" && value !== null && !Array.isArray(value);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -923,7 +971,11 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 	}
 
 	private cleanFileName(fileName: string): string {
-		return fileName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").trim() || "untitled";
+		const cleaned = Array.from(fileName, (character) =>
+			INVALID_FILE_NAME_CHARS.has(character) || character.charCodeAt(0) < 32 ? "-" : character
+		).join("");
+
+		return cleaned.trim() || "untitled";
 	}
 
 	private async ensureFolder(folderPath: string): Promise<void> {
@@ -1142,7 +1194,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 	}
 
 	private escapeMarkdownText(text: string): string {
-		return text.replace(/\\/g, "\\\\").replace(/([\[\]])/g, "\\$1");
+		return text.replace(/\\/g, "\\\\").split("[").join("\\[").split("]").join("\\]");
 	}
 
 	private escapeMarkdownHeading(text: string): string {
@@ -1209,7 +1261,7 @@ class ReadableHtmlView extends FileView {
 	}
 
 	private createIframe(): HTMLIFrameElement {
-		const iframe = document.createElement("iframe");
+		const iframe = activeDocument.createElement("iframe");
 		iframe.setAttribute("title", "Readable HTML");
 		iframe.setAttribute("sandbox", "allow-same-origin allow-popups allow-popups-to-escape-sandbox");
 		iframe.setAttribute(
@@ -1297,26 +1349,30 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
+		this.renderSettings();
+	}
+
+	private renderSettings(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: this.plugin.t("settingsTitle") });
+		new Setting(containerEl).setName(this.plugin.t("settingsTitle")).setHeading();
 
 		new Setting(containerEl)
 			.setName(this.plugin.t("settingLanguageName"))
 			.setDesc(this.plugin.t("settingLanguageDesc"))
 			.addDropdown((dropdown) => {
-				dropdown
-					.addOption("zh", this.plugin.t("languageChinese"))
-					.addOption("en", this.plugin.t("languageEnglish"))
-					.setValue(this.plugin.getInterfaceLanguage())
-					.onChange(async (value) => {
-						this.plugin.settings.interfaceLanguage = value === "en" ? "en" : "zh";
-						await this.plugin.saveSettings();
-						new Notice(this.plugin.t("noticeReloadRequired"));
-						this.display();
-					});
-			});
+					dropdown
+						.addOption("zh", this.plugin.t("languageChinese"))
+						.addOption("en", this.plugin.t("languageEnglish"))
+						.setValue(this.plugin.getInterfaceLanguage())
+						.onChange(async (value) => {
+							this.plugin.settings.interfaceLanguage = value === "en" ? "en" : "zh";
+							await this.plugin.saveSettings();
+							new Notice(this.plugin.t("noticeReloadRequired"));
+							this.renderSettings();
+						});
+				});
 
 		new Setting(containerEl)
 			.setName(this.plugin.t("settingExportFolderName"))
