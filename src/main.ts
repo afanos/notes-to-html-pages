@@ -409,7 +409,13 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			"<ol>",
 			items.join("\n"),
 			"</ol>",
-			"</nav>"
+			"</nav>",
+			'<aside class="side-table-of-contents" aria-label="章节目录">',
+			'<div class="side-toc-title">目录</div>',
+			"<ol>",
+			items.join("\n"),
+			"</ol>",
+			"</aside>"
 		].join("\n");
 	}
 
@@ -1183,6 +1189,8 @@ const CLEAN_HTML_CSS = `
 html {
 	background: var(--page-bg);
 	font-size: 16px;
+	scroll-behavior: smooth;
+	scroll-padding-top: 1.4rem;
 }
 
 body {
@@ -1216,7 +1224,7 @@ body {
 	max-width: 720px;
 	margin: 0 auto;
 	color: #1f1f1d;
-	font-size: clamp(1.9rem, 4vw, 2.55rem);
+	font-size: 2.25rem;
 	font-weight: 700;
 	line-height: 1.25;
 	letter-spacing: 0;
@@ -1298,16 +1306,86 @@ body {
 	display: grid;
 	grid-template-columns: 2.2em minmax(0, 1fr);
 	gap: 0.35rem;
+	margin: 0 -0.35rem;
+	padding: 0.12rem 0.35rem;
+	border-radius: 5px;
 	color: var(--ink);
 	text-decoration: none;
+	cursor: pointer;
+	transition: color 160ms ease, background-color 160ms ease;
 }
 
 .table-of-contents a::before {
 	content: counter(toc, cjk-ideographic);
 	color: var(--muted);
+	transition: color 160ms ease;
 }
 
-.table-of-contents a:hover {
+.table-of-contents a:hover,
+.table-of-contents a:focus-visible {
+	background: var(--accent-soft);
+	color: var(--accent);
+}
+
+.table-of-contents a:hover::before,
+.table-of-contents a:focus-visible::before {
+	color: var(--accent);
+}
+
+.side-table-of-contents {
+	display: none;
+}
+
+.side-toc-title {
+	margin: 0 0 0.75rem;
+	color: var(--muted);
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.side-table-of-contents ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: side-toc;
+	font-size: 0.82rem;
+	line-height: 1.45;
+}
+
+.side-table-of-contents li {
+	margin: 0;
+	padding: 0;
+	counter-increment: side-toc;
+}
+
+.side-table-of-contents a {
+	display: grid;
+	grid-template-columns: 1.7em minmax(0, 1fr);
+	gap: 0.35rem;
+	margin: 0 -0.35rem;
+	padding: 0.28rem 0.35rem;
+	border-radius: 5px;
+	color: var(--muted);
+	text-decoration: none;
+	cursor: pointer;
+	transition: color 160ms ease, background-color 160ms ease;
+}
+
+.side-table-of-contents a::before {
+	content: counter(side-toc, cjk-ideographic);
+	color: #aaa39a;
+	transition: color 160ms ease;
+}
+
+.side-table-of-contents a:hover,
+.side-table-of-contents a:focus-visible {
+	background: var(--accent-soft);
+	color: var(--accent);
+}
+
+.side-table-of-contents a:hover::before,
+.side-table-of-contents a:focus-visible::before {
 	color: var(--accent);
 }
 
@@ -1339,6 +1417,10 @@ body {
 	border: 0;
 	font-size: 1.55rem;
 	font-weight: 700;
+}
+
+.article-body h2:target {
+	color: var(--accent);
 }
 
 .article-body h2::before {
@@ -1487,6 +1569,21 @@ img {
 
 sup {
 	line-height: 0;
+}
+
+@media (min-width: 1360px) {
+	.side-table-of-contents {
+		display: block;
+		position: fixed;
+		top: 4.6rem;
+		right: max(1.2rem, calc((100vw - 860px) / 2 - 14.8rem));
+		width: 13rem;
+		max-height: calc(100vh - 6rem);
+		padding: 0.85rem 0.95rem;
+		border-left: 1px solid var(--line-soft);
+		background: rgba(251, 250, 247, 0.92);
+		overflow: auto;
+	}
 }
 
 @media (max-width: 780px) {
