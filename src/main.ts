@@ -973,12 +973,6 @@ class ReadableHtmlView extends FileView {
 		);
 		this.contentEl.appendChild(iframe);
 
-		const fileHref = this.getFileHref(file.path);
-		if (fileHref) {
-			iframe.src = fileHref;
-			return;
-		}
-
 		iframe.srcdoc = this.injectBaseHref(html, this.getBaseHref(file.path));
 	}
 
@@ -1044,16 +1038,6 @@ class ReadableHtmlView extends FileView {
 				link.setAttribute("href", `about:srcdoc${href}`);
 			}
 		});
-	}
-
-	private getFileHref(vaultPath: string): string | null {
-		if (!(this.app.vault.adapter instanceof FileSystemAdapter)) {
-			return null;
-		}
-
-		const basePath = normalizePath(this.app.vault.adapter.getBasePath());
-		const absolutePath = normalizePath(`${basePath}/${vaultPath}`);
-		return this.pathToFileUri(absolutePath);
 	}
 
 	private getBaseHref(vaultPath: string): string | null {
