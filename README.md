@@ -35,6 +35,7 @@
 
 ![导出前后对比：Markdown 到 HTML 阅读页](assets/before-after-html-page.png)
 
+目录和右侧批注效果：
 ![目录、表格与右侧批注阅读效果](assets/annotations-toc-table.png)
 
 ## 功能特性
