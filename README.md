@@ -35,7 +35,7 @@
 
 ![导出前后对比：Markdown 到 HTML 阅读页](assets/before-after-html-page.png)
 
-![可点击目录与表格阅读效果](assets/toc-table-effect.png)
+![目录、表格与右侧批注阅读效果](assets/annotations-toc-table.png)
 
 ## 功能特性
 

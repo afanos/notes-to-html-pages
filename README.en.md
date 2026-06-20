@@ -33,7 +33,7 @@ Each exported `.html` is standalone: it uses inline CSS and optional embedded lo
 
 ![Before and after: Markdown to HTML reading page](assets/before-after-html-page.png)
 
-![Clickable table of contents and readable tables](assets/toc-table-effect.png)
+![Table of contents, readable tables, and margin annotations](assets/annotations-toc-table.png)
 
 ## Features
 
