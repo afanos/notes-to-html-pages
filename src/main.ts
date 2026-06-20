@@ -73,7 +73,23 @@ const UI_TEXT: Record<UiLanguage, Record<string, string>> = {
 		settingInsertLinkName: "在原文开头插入阅读版双链",
 		settingInsertLinkDesc: "导出后，在原文开头放入指向入口笔记的双链。再次导出会自动更新，不会重复添加。",
 		settingEmbedImagesName: "内嵌本地图片",
-		settingEmbedImagesDesc: "把本地图片转为 data URI，方便 HTML 文件独立打开。"
+		settingEmbedImagesDesc: "把本地图片转为 data URI，方便 HTML 文件独立打开。",
+		settingSyncAnnotationsName: "批注同步回原 Markdown",
+		settingSyncAnnotationsDesc: "在 Obsidian 内阅读 HTML 时，选中文本添加的批注会写回源笔记。独立浏览器打开时仍可临时划线和批注。",
+		annotationToolbarUnderline: "划线",
+		annotationInlinePlaceholder: "这里可以写备注...",
+		annotationInlineSave: "保存",
+		annotationCardPlaceholder: "添加批注...",
+		annotationComposerSave: "保存",
+		annotationDelete: "删除",
+		annotationPanelTitle: "批注",
+		annotationQuoteLabel: "原文",
+		annotationNoteLabel: "批注",
+		annotationSyncDisabled: "仅保存在当前页面",
+		annotationSyncedNotice: "批注已同步到原 Markdown。",
+		annotationSyncFailedNotice: "批注同步失败，请稍后重试。",
+		annotationDeletedNotice: "批注已删除。",
+		annotationDeleteFailedNotice: "批注删除同步失败，请稍后重试。"
 	},
 	en: {
 		ribbonExportCurrentNote: "Export current note to HTML page",
@@ -120,7 +136,23 @@ const UI_TEXT: Record<UiLanguage, Record<string, string>> = {
 		settingInsertLinkName: "Insert HTML backlink at source note top",
 		settingInsertLinkDesc: "After export, insert a backlink to the generated reading page at the top of the source note. Re-exporting updates it without duplicates.",
 		settingEmbedImagesName: "Embed local images",
-		settingEmbedImagesDesc: "Converts local images to data URIs so the HTML file can be opened standalone."
+		settingEmbedImagesDesc: "Converts local images to data URIs so the HTML file can be opened standalone.",
+		settingSyncAnnotationsName: "Sync annotations back to Markdown",
+		settingSyncAnnotationsDesc: "When reading HTML inside Obsidian, selected-text annotations are written back to the source note. Standalone browser reading still supports temporary highlights and comments.",
+		annotationToolbarUnderline: "Underline",
+		annotationInlinePlaceholder: "Write a note here...",
+		annotationInlineSave: "Save",
+		annotationCardPlaceholder: "Add a note...",
+		annotationComposerSave: "Save",
+		annotationDelete: "Delete",
+		annotationPanelTitle: "Annotations",
+		annotationQuoteLabel: "Quote",
+		annotationNoteLabel: "Note",
+		annotationSyncDisabled: "Saved in this page only",
+		annotationSyncedNotice: "Annotation synced to the source Markdown note.",
+		annotationSyncFailedNotice: "Annotation sync failed. Please try again.",
+		annotationDeletedNotice: "Annotation deleted.",
+		annotationDeleteFailedNotice: "Annotation deletion could not be synced. Please try again."
 	}
 };
 
@@ -135,6 +167,7 @@ interface ReadableHtmlSettings {
 	openHtmlInObsidian: boolean;
 	createLauncherNote: boolean;
 	insertLinkInSource: boolean;
+	syncAnnotationsToSource: boolean;
 }
 
 const DEFAULT_SETTINGS: ReadableHtmlSettings = {
@@ -147,13 +180,44 @@ const DEFAULT_SETTINGS: ReadableHtmlSettings = {
 	embedLocalImages: true,
 	openHtmlInObsidian: true,
 	createLauncherNote: false,
-	insertLinkInSource: true
+	insertLinkInSource: true,
+	syncAnnotationsToSource: true
 };
 
 const SOURCE_LINK_BLOCK_REGEX =
 	/(?:%% readable-html-exporter-link:start %%\r?\n)?^> (?:阅读版 HTML|HTML 页面|Readable HTML|HTML Page)\s*[：:]\s*\[\[[^\]]+\|(?:打开对应 HTML|打开 HTML 页面|Open HTML|Open HTML Page)\]\]\s*\r?\n(?:%% readable-html-exporter-link:end %%\r?\n?)?/gm;
 
 const INVALID_FILE_NAME_CHARS = new Set(['<', '>', ':', '"', '/', "\\", "|", "?", "*"]);
+
+const ANNOTATIONS_BLOCK_START = "<!-- notes-to-html-pages-annotations:start -->";
+const ANNOTATIONS_BLOCK_END = "<!-- notes-to-html-pages-annotations:end -->";
+const ANNOTATIONS_BLOCK_REGEX =
+	/<!-- notes-to-html-pages-annotations:start -->[\s\S]*?<!-- notes-to-html-pages-annotations:end -->/;
+const ANNOTATIONS_DATA_REGEX =
+	/<!-- notes-to-html-pages-annotations:data\s*([\s\S]*?)\s*notes-to-html-pages-annotations:data-end -->/;
+
+interface HtmlAnnotation {
+	id: string;
+	selectedText: string;
+	note: string;
+	createdAt: string;
+	sourcePath?: string;
+}
+
+interface HtmlAnnotationCreatedMessage {
+	plugin: "notes-to-html-pages";
+	type: "annotation-created";
+	annotation: HtmlAnnotation;
+}
+
+interface HtmlAnnotationDeletedMessage {
+	plugin: "notes-to-html-pages";
+	type: "annotation-deleted";
+	annotationId: string;
+	sourcePath: string;
+}
+
+type HtmlAnnotationMessage = HtmlAnnotationCreatedMessage | HtmlAnnotationDeletedMessage;
 
 interface ExportPaths {
 	htmlPath: string;
@@ -173,7 +237,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		this.markdown = this.createMarkdownRenderer();
 
 		if (this.settings.openHtmlInObsidian) {
-			this.registerView(VIEW_TYPE_READABLE_HTML, (leaf) => new ReadableHtmlView(leaf));
+			this.registerView(VIEW_TYPE_READABLE_HTML, (leaf) => new ReadableHtmlView(leaf, this));
 
 			try {
 				this.registerExtensions(["html", "htm"], VIEW_TYPE_READABLE_HTML);
@@ -281,6 +345,9 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		}
 		if (typeof data.insertLinkInSource === "boolean") {
 			settings.insertLinkInSource = data.insertLinkInSource;
+		}
+		if (typeof data.syncAnnotationsToSource === "boolean") {
+			settings.syncAnnotationsToSource = data.syncAnnotationsToSource;
 		}
 
 		return settings;
@@ -440,10 +507,12 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 
 	private async renderFileToHtml(file: TFile): Promise<{ html: string; title: string }> {
 		const raw = await this.app.vault.cachedRead(file);
+		const annotations = this.extractAnnotations(raw);
 		const { content, frontmatterTitle } = this.stripFrontmatter(raw);
 		const contentWithoutSourceLink = this.removeSourceLinkBlock(content);
-		const prepared = await this.prepareMarkdown(contentWithoutSourceLink, file);
-		const title = this.findFirstHeading(contentWithoutSourceLink) ?? frontmatterTitle ?? file.basename;
+		const contentWithoutAnnotations = this.removeAnnotationsBlock(contentWithoutSourceLink);
+		const prepared = await this.prepareMarkdown(contentWithoutAnnotations, file);
+		const title = this.findFirstHeading(contentWithoutAnnotations) ?? frontmatterTitle ?? file.basename;
 		const shouldAddTitle =
 			this.settings.addTitleFromFilename && !this.hasTopLevelHeading(prepared);
 		const markdown = shouldAddTitle ? `# ${title}\n\n${prepared}` : prepared;
@@ -452,6 +521,8 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		const documentLanguage: UiLanguage = /[\u3400-\u9fff]/.test(raw) ? "zh" : "en";
 		const body = this.buildStyledBody(renderedBody, title, stylePreset, documentLanguage);
 		const lang = documentLanguage === "zh" ? "zh-CN" : "en";
+		const annotationConfig = this.createAnnotationConfig(file, documentLanguage);
+		const annotationData = this.createAnnotationDataScript(annotations);
 
 		return {
 			title,
@@ -462,6 +533,8 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			'<meta charset="utf-8">',
 			'<meta name="viewport" content="width=device-width, initial-scale=1">',
 			`<meta name="notes-to-html-pages-style" content="${stylePreset}">`,
+			`<meta name="notes-to-html-pages-source" content="${this.escapeHtml(file.path)}">`,
+			`<meta name="notes-to-html-pages-sync-annotations" content="${this.settings.syncAnnotationsToSource ? "true" : "false"}">`,
 			`<title>${this.escapeHtml(title)}</title>`,
 			`<style>${this.getStyleCss(stylePreset)}</style>`,
 			"</head>",
@@ -469,10 +542,70 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			'<main class="page">',
 			body,
 			"</main>",
+			annotationConfig,
+			annotationData,
+			`<script>${ANNOTATION_SCRIPT}</script>`,
 			"</body>",
 			"</html>"
 			].join("\n")
 		};
+	}
+
+	async syncAnnotationToSource(sourcePath: string, annotation: HtmlAnnotation): Promise<void> {
+		if (!this.settings.syncAnnotationsToSource) {
+			return;
+		}
+
+		const sourceFile = this.app.vault.getAbstractFileByPath(sourcePath);
+		if (!(sourceFile instanceof TFile) || sourceFile.extension !== "md") {
+			throw new Error(`Source Markdown file not found: ${sourcePath}`);
+		}
+
+		const normalized = this.normalizeAnnotation(annotation, sourceFile.path);
+		const raw = await this.app.vault.read(sourceFile);
+		const annotations = this.extractAnnotations(raw);
+		const existingIndex = annotations.findIndex((item) => item.id === normalized.id);
+		const nextAnnotations =
+			existingIndex >= 0
+				? annotations.map((item, index) => (index === existingIndex ? normalized : item))
+				: [...annotations, normalized];
+		const block = this.createAnnotationsMarkdownBlock(nextAnnotations, this.getInterfaceLanguage());
+		const updated = ANNOTATIONS_BLOCK_REGEX.test(raw)
+			? raw.replace(ANNOTATIONS_BLOCK_REGEX, block)
+			: `${raw.replace(/\s+$/g, "")}\n\n${block}\n`;
+
+		if (updated !== raw) {
+			await this.app.vault.modify(sourceFile, updated);
+		}
+	}
+
+	async deleteAnnotationFromSource(sourcePath: string, annotationId: string): Promise<void> {
+		if (!this.settings.syncAnnotationsToSource) {
+			return;
+		}
+
+		const sourceFile = this.app.vault.getAbstractFileByPath(sourcePath);
+		if (!(sourceFile instanceof TFile) || sourceFile.extension !== "md") {
+			throw new Error(`Source Markdown file not found: ${sourcePath}`);
+		}
+
+		const raw = await this.app.vault.read(sourceFile);
+		const annotations = this.extractAnnotations(raw);
+		const nextAnnotations = annotations.filter((annotation) => annotation.id !== annotationId);
+		if (nextAnnotations.length === annotations.length) {
+			return;
+		}
+
+		const updated = nextAnnotations.length > 0
+			? raw.replace(
+				ANNOTATIONS_BLOCK_REGEX,
+				this.createAnnotationsMarkdownBlock(nextAnnotations, this.getInterfaceLanguage())
+			)
+			: raw.replace(ANNOTATIONS_BLOCK_REGEX, "").replace(/\n{3,}/g, "\n\n").replace(/\s+$/g, "\n");
+
+		if (updated !== raw) {
+			await this.app.vault.modify(sourceFile, updated);
+		}
 	}
 
 	private getStylePreset(): HtmlStylePreset {
@@ -486,6 +619,186 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			return CLEAN_HTML_CSS;
 		}
 		return CLEAN_HTML_CSS;
+	}
+
+	private createAnnotationConfig(sourceFile: TFile, documentLanguage: UiLanguage): string {
+		const textKeys = [
+			"annotationToolbarUnderline",
+			"annotationInlinePlaceholder",
+			"annotationInlineSave",
+			"annotationCardPlaceholder",
+			"annotationComposerSave",
+			"annotationDelete",
+			"annotationPanelTitle",
+			"annotationQuoteLabel",
+			"annotationNoteLabel",
+			"annotationSyncDisabled"
+		] as Array<keyof typeof UI_TEXT.zh>;
+		const text: Record<string, string> = {};
+
+		for (const key of textKeys) {
+			text[key] = this.tForLanguage(documentLanguage, key);
+		}
+
+		return `<script type="application/json" id="notes-to-html-pages-config">${this.escapeJsonScript(
+			JSON.stringify({
+				sourcePath: sourceFile.path,
+				syncAnnotationsToSource: this.settings.syncAnnotationsToSource,
+				text
+			})
+		)}</script>`;
+	}
+
+	private createAnnotationDataScript(annotations: HtmlAnnotation[]): string {
+		return `<script type="application/json" id="notes-to-html-pages-annotations">${this.escapeJsonScript(
+			JSON.stringify(annotations)
+		)}</script>`;
+	}
+
+	private extractAnnotations(markdown: string): HtmlAnnotation[] {
+		const block = markdown.match(ANNOTATIONS_BLOCK_REGEX)?.[0];
+		if (!block) {
+			return [];
+		}
+
+		const dataMatch = block.match(ANNOTATIONS_DATA_REGEX);
+		if (!dataMatch) {
+			return [];
+		}
+
+		try {
+			const rawData = dataMatch[1].trim();
+			const json = /%[0-9a-f]{2}/i.test(rawData) ? decodeURIComponent(rawData) : rawData;
+			const parsed = JSON.parse(json) as unknown;
+
+			if (!Array.isArray(parsed)) {
+				return [];
+			}
+
+			const annotations: HtmlAnnotation[] = [];
+			for (const item of parsed) {
+				if (this.isHtmlAnnotation(item)) {
+					annotations.push(this.normalizeAnnotation(item, item.sourcePath));
+				}
+			}
+			return annotations;
+		} catch (error) {
+			console.warn("Notes to HTML Pages could not parse saved annotations.", error);
+			return [];
+		}
+	}
+
+	private removeAnnotationsBlock(markdown: string): string {
+		return markdown.replace(ANNOTATIONS_BLOCK_REGEX, "").replace(/\n{3,}/g, "\n\n");
+	}
+
+	private isHtmlAnnotation(value: unknown): value is HtmlAnnotation {
+		return (
+			this.isRecord(value) &&
+			typeof value.id === "string" &&
+			typeof value.selectedText === "string" &&
+			typeof value.note === "string" &&
+			typeof value.createdAt === "string" &&
+			(typeof value.sourcePath === "undefined" || typeof value.sourcePath === "string")
+		);
+	}
+
+	private normalizeAnnotation(annotation: HtmlAnnotation, sourcePath?: string): HtmlAnnotation {
+		return {
+			id: annotation.id.trim() || `annotation-${Date.now()}`,
+			selectedText: this.compactText(annotation.selectedText).slice(0, 2000),
+			note: this.compactText(annotation.note).slice(0, 2000),
+			createdAt: annotation.createdAt || new Date().toISOString(),
+			sourcePath: sourcePath || annotation.sourcePath
+		};
+	}
+
+	private createAnnotationsMarkdownBlock(
+		annotations: HtmlAnnotation[],
+		language: UiLanguage
+	): string {
+		const title = language === "zh" ? "## HTML 页面批注" : "## HTML Page Annotations";
+		const quoteLabel = this.tForLanguage(language, "annotationQuoteLabel");
+		const noteLabel = this.tForLanguage(language, "annotationNoteLabel");
+		const readableItems = annotations
+			.map((annotation) => {
+				const lines = [
+					`- **${this.formatAnnotationDate(annotation.createdAt)}**`,
+					`  - ${quoteLabel}: ==${this.escapeAnnotationMarkdown(annotation.selectedText)}==`
+				];
+				if (annotation.note) {
+					lines.push(`  - ${noteLabel}: ${this.escapeAnnotationMarkdown(annotation.note)}`);
+				}
+				lines.push(`  - ID: \`${this.escapeMarkdownCode(annotation.id)}\``);
+				return lines.join("\n");
+			})
+			.join("\n");
+		const data = encodeURIComponent(JSON.stringify(annotations, null, 2));
+
+		return [
+			ANNOTATIONS_BLOCK_START,
+			title,
+			"",
+			readableItems,
+			"",
+			`<!-- notes-to-html-pages-annotations:data\n${data}\nnotes-to-html-pages-annotations:data-end -->`,
+			ANNOTATIONS_BLOCK_END
+		].join("\n");
+	}
+
+	private sanitizeGeneratedBody(wrapper: Element): void {
+		Array.from(wrapper.querySelectorAll("script")).forEach((element) => element.remove());
+		Array.from(wrapper.querySelectorAll("*")).forEach((element) => {
+			Array.from(element.attributes).forEach((attribute) => {
+				const name = attribute.name.toLowerCase();
+				const value = attribute.value.trim();
+				if (
+					name.startsWith("on") ||
+					(["href", "src", "xlink:href"].includes(name) && /^javascript:/i.test(value))
+				) {
+					element.removeAttribute(attribute.name);
+				}
+			});
+		});
+	}
+
+	private formatAnnotationDate(value: string): string {
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) {
+			return value;
+		}
+
+		const pad = (part: number) => String(part).padStart(2, "0");
+		return [
+			`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+			`${pad(date.getHours())}:${pad(date.getMinutes())}`
+		].join(" ");
+	}
+
+	private compactText(text: string): string {
+		return text.replace(/\s+/g, " ").trim();
+	}
+
+	private escapeAnnotationMarkdown(text: string): string {
+		return this.compactText(text)
+			.replace(/\\/g, "\\\\")
+			.replace(/`/g, "'")
+			.replace(/\[/g, "\\[")
+			.replace(/]/g, "\\]")
+			.replace(/==/g, "=");
+	}
+
+	private escapeMarkdownCode(text: string): string {
+		return text.replace(/`/g, "'");
+	}
+
+	private escapeJsonScript(json: string): string {
+		return json
+			.replace(/</g, "\\u003c")
+			.replace(/>/g, "\\u003e")
+			.replace(/&/g, "\\u0026")
+			.replace(/\u2028/g, "\\u2028")
+			.replace(/\u2029/g, "\\u2029");
 	}
 
 	private buildStyledBody(
@@ -519,6 +832,7 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		this.removeLeadingManualToc(wrapper);
 		this.normalizeSectionHeadings(wrapper);
 		this.enhanceReadableBlocks(wrapper, documentLanguage);
+		this.sanitizeGeneratedBody(wrapper);
 		const toc = this.createAutoToc(wrapper, documentLanguage);
 
 		return [
@@ -1230,7 +1544,9 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 }
 
 class ReadableHtmlView extends FileView {
-	constructor(leaf: WorkspaceLeaf) {
+	private detachMessageListener: (() => void) | null = null;
+
+	constructor(leaf: WorkspaceLeaf, private plugin: ReadableHtmlExporterPlugin) {
 		super(leaf);
 	}
 
@@ -1246,6 +1562,9 @@ class ReadableHtmlView extends FileView {
 		const html = await this.app.vault.cachedRead(file);
 		const iframe = this.createIframe();
 
+		this.detachMessageListener?.();
+		this.attachMessageListener(iframe);
+
 		this.contentEl.empty();
 		this.contentEl.setAttr(
 			"style",
@@ -1257,18 +1576,20 @@ class ReadableHtmlView extends FileView {
 	}
 
 	async onUnloadFile(): Promise<void> {
+		this.detachMessageListener?.();
+		this.detachMessageListener = null;
 		this.contentEl.empty();
 	}
 
 	private createIframe(): HTMLIFrameElement {
 		const iframe = activeDocument.createElement("iframe");
 		iframe.setAttribute("title", "Readable HTML");
-		iframe.setAttribute("sandbox", "allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+		iframe.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
 		iframe.setAttribute(
 			"csp",
 			[
 				"default-src 'none'",
-				"script-src 'none'",
+				"script-src 'unsafe-inline'",
 				"object-src 'none'",
 				"frame-src 'none'",
 				"style-src 'unsafe-inline'",
@@ -1282,6 +1603,88 @@ class ReadableHtmlView extends FileView {
 			"width: 100%; height: 100%; border: 0; display: block; background: white;"
 		);
 		return iframe;
+	}
+
+	private attachMessageListener(iframe: HTMLIFrameElement): void {
+		const listener = (event: MessageEvent) => {
+			if (event.source !== iframe.contentWindow) {
+				return;
+			}
+
+			const message: unknown = event.data;
+			if (!this.isAnnotationMessage(message)) {
+				return;
+			}
+
+			void this.handleAnnotationMessage(message);
+		};
+
+		activeWindow.addEventListener("message", listener);
+		this.detachMessageListener = () => activeWindow.removeEventListener("message", listener);
+	}
+
+	private async handleAnnotationMessage(message: HtmlAnnotationMessage): Promise<void> {
+		if (!this.plugin.settings.syncAnnotationsToSource) {
+			return;
+		}
+
+		try {
+			if (message.type === "annotation-created") {
+				if (!message.annotation.sourcePath) {
+					return;
+				}
+				await this.plugin.syncAnnotationToSource(message.annotation.sourcePath, message.annotation);
+				new Notice(this.plugin.t("annotationSyncedNotice"));
+				return;
+			}
+
+			await this.plugin.deleteAnnotationFromSource(message.sourcePath, message.annotationId);
+			new Notice(this.plugin.t("annotationDeletedNotice"));
+		} catch (error) {
+			console.error(error);
+			new Notice(
+				this.plugin.t(
+					message.type === "annotation-deleted"
+						? "annotationDeleteFailedNotice"
+						: "annotationSyncFailedNotice"
+				)
+			);
+		}
+	}
+
+	private isAnnotationMessage(value: unknown): value is HtmlAnnotationMessage {
+		if (!this.isRecord(value)) {
+			return false;
+		}
+
+		if (value.plugin !== "notes-to-html-pages") {
+			return false;
+		}
+
+		if (value.type === "annotation-created") {
+			return this.isAnnotationPayload(value.annotation);
+		}
+
+		return (
+			value.type === "annotation-deleted" &&
+			typeof value.annotationId === "string" &&
+			typeof value.sourcePath === "string"
+		);
+	}
+
+	private isAnnotationPayload(value: unknown): value is HtmlAnnotation {
+		return (
+			this.isRecord(value) &&
+			typeof value.id === "string" &&
+			typeof value.selectedText === "string" &&
+			typeof value.note === "string" &&
+			typeof value.createdAt === "string" &&
+			(typeof value.sourcePath === "undefined" || typeof value.sourcePath === "string")
+		);
+	}
+
+	private isRecord(value: unknown): value is Record<string, unknown> {
+		return typeof value === "object" && value !== null && !Array.isArray(value);
 	}
 
 	private injectBaseHref(html: string, baseHref: string | null): string {
@@ -1468,6 +1871,18 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName(this.plugin.t("settingSyncAnnotationsName"))
+			.setDesc(this.plugin.t("settingSyncAnnotationsDesc"))
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.syncAnnotationsToSource)
+					.onChange(async (value) => {
+						this.plugin.settings.syncAnnotationsToSource = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName(this.plugin.t("settingEmbedImagesName"))
 			.setDesc(this.plugin.t("settingEmbedImagesDesc"))
 			.addToggle((toggle) =>
@@ -1478,6 +1893,811 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 			);
 	}
 }
+
+const ANNOTATION_SCRIPT = `
+(() => {
+	"use strict";
+
+	const config = readJson("notes-to-html-pages-config", {});
+	const savedAnnotations = readJson("notes-to-html-pages-annotations", []);
+	const text = Object.assign(
+		{
+			annotationToolbarUnderline: "Underline",
+			annotationInlinePlaceholder: "Write a note here...",
+			annotationInlineSave: "Save note",
+			annotationComposerSave: "Save",
+			annotationDelete: "Delete",
+			annotationPanelTitle: "Annotations",
+			annotationCardPlaceholder: "Add a note...",
+			annotationSyncDisabled: "Saved in this page only"
+		},
+		config.text || {}
+	);
+	const article = document.querySelector(".article-body");
+	if (!article) return;
+
+	const state = {
+		range: null,
+		annotations: []
+	};
+	const popover = createPopover();
+	const panel = createPanel();
+
+	document.body.append(popover, panel);
+	window.addEventListener("resize", () => {
+		scheduleAnnotationLayout();
+		if (!usesInlineAnnotations()) {
+			closeInlineAnnotations();
+		}
+	});
+	if (document.fonts && document.fonts.ready) {
+		document.fonts.ready.then(scheduleAnnotationLayout);
+		}
+	document.addEventListener("mouseup", (event) => {
+		if (isInsideAnnotationUi(event.target)) {
+			return;
+		}
+		window.setTimeout(updateSelectionUi, 0);
+	});
+	document.addEventListener("keyup", (event) => {
+		if (event.key === "Escape") {
+			hidePopover();
+			return;
+		}
+		if (isEditableTarget(event.target)) {
+			return;
+		}
+		window.setTimeout(updateSelectionUi, 0);
+	});
+	document.addEventListener("mousedown", (event) => {
+		const target = event.target;
+		if (popover.contains(target) || isEditableTarget(target)) {
+			return;
+		}
+		cancelAnnotationEditors();
+		if (target instanceof Node && !article.contains(target) && !panel.contains(target)) {
+			hidePopover();
+		}
+	});
+
+	for (const annotation of Array.isArray(savedAnnotations) ? savedAnnotations : []) {
+		if (isAnnotation(annotation)) {
+			addAnnotation(annotation, true);
+		}
+	}
+	updatePanelVisibility();
+	scheduleAnnotationLayout();
+
+	function readJson(id, fallback) {
+		const element = document.getElementById(id);
+		if (!element || !element.textContent) return fallback;
+		try {
+			return JSON.parse(element.textContent);
+		} catch (_error) {
+			return fallback;
+		}
+	}
+
+	function isInsideAnnotationUi(target) {
+		return target instanceof Node && (popover.contains(target) || panel.contains(target));
+	}
+
+	function isEditableTarget(target) {
+		return target instanceof Element && Boolean(target.closest("input, textarea, button"));
+	}
+
+	function createPopover() {
+		const element = document.createElement("div");
+		element.className = "annotation-popover";
+		element.hidden = true;
+
+		const actions = document.createElement("div");
+		actions.className = "annotation-popover-actions";
+
+		const underline = document.createElement("button");
+		underline.type = "button";
+		underline.className = "annotation-underline-button";
+		underline.textContent = text.annotationToolbarUnderline;
+		underline.addEventListener("click", () => saveCurrentAnnotation(""));
+		actions.append(underline);
+
+		const noteRow = document.createElement("div");
+		noteRow.className = "annotation-note-row";
+
+		const input = document.createElement("input");
+		input.type = "text";
+		input.className = "annotation-note-input";
+		input.placeholder = text.annotationInlinePlaceholder;
+		input.setAttribute("aria-label", text.annotationInlinePlaceholder);
+		input.addEventListener("keydown", (event) => {
+			if (event.key === "Enter") {
+				event.preventDefault();
+				saveCurrentAnnotation(input.value);
+			}
+		});
+
+		const save = document.createElement("button");
+		save.type = "button";
+		save.className = "annotation-mini-save";
+		save.textContent = text.annotationInlineSave;
+		save.addEventListener("click", () => saveCurrentAnnotation(input.value));
+
+		noteRow.append(input, save);
+		element.append(actions, noteRow);
+		return element;
+	}
+
+	function createPanel() {
+		const element = document.createElement("aside");
+		element.className = "annotation-panel";
+		element.hidden = true;
+
+		const title = document.createElement("div");
+		title.className = "annotation-panel-title";
+		title.textContent = text.annotationPanelTitle;
+
+		const list = document.createElement("div");
+		list.className = "annotation-list";
+
+		element.append(title, list);
+		return element;
+	}
+
+	function updateSelectionUi() {
+		const selection = window.getSelection();
+		if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+			hidePopover();
+			return;
+		}
+
+		const range = selection.getRangeAt(0);
+		const selectedText = compactText(range.toString());
+		if (!selectedText || !article.contains(range.startContainer) || !article.contains(range.endContainer)) {
+			hidePopover();
+			return;
+		}
+
+		const rect = getRangeAnchorRect(range);
+		if (!rect) {
+			hidePopover();
+			return;
+		}
+
+		state.range = range.cloneRange();
+		positionPopover(rect);
+		const input = popover.querySelector(".annotation-note-input");
+		if (input) input.value = "";
+		popover.hidden = false;
+	}
+
+	function getRangeAnchorRect(range) {
+		const rects = Array.from(range.getClientRects()).filter((rect) => rect.width && rect.height);
+		return rects[rects.length - 1] || null;
+	}
+
+	function positionPopover(rect) {
+		popover.style.left = "0px";
+		popover.style.top = "0px";
+		const width = popover.offsetWidth || 280;
+		const left = Math.min(
+			window.scrollX + window.innerWidth - width - 14,
+			Math.max(14 + window.scrollX, window.scrollX + rect.left)
+		);
+		const top = window.scrollY + rect.bottom + 8;
+		popover.style.left = left + "px";
+		popover.style.top = top + "px";
+	}
+
+	function hidePopover() {
+		popover.hidden = true;
+	}
+
+	function saveCurrentAnnotation(note) {
+		if (!state.range) return;
+
+		const selectedText = compactText(state.range.toString());
+		if (!selectedText) return;
+
+		const annotation = {
+			id: "ntoh-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8),
+			selectedText,
+			note: compactText(note),
+			createdAt: new Date().toISOString(),
+			sourcePath: typeof config.sourcePath === "string" ? config.sourcePath : ""
+		};
+
+		addAnnotation(annotation, false);
+		hidePopover();
+		const selection = window.getSelection();
+		if (selection) selection.removeAllRanges();
+		state.range = null;
+	}
+
+	function addAnnotation(annotation, fromSaved) {
+		const normalized = {
+			id: String(annotation.id || ""),
+			selectedText: compactText(String(annotation.selectedText || "")),
+			note: compactText(String(annotation.note || "")),
+			createdAt: String(annotation.createdAt || new Date().toISOString()),
+			sourcePath: String(annotation.sourcePath || config.sourcePath || "")
+		};
+		if (!normalized.id || !normalized.selectedText) return;
+
+		const marked = markAnnotation(normalized, fromSaved);
+		state.annotations.push(normalized);
+		const annotationIndex = state.annotations.length;
+		renderAnnotationCard(normalized, annotationIndex, marked);
+		renderInlineAnnotation(normalized, annotationIndex, marked);
+		updatePanelVisibility();
+		scheduleAnnotationLayout();
+
+		if (!fromSaved) {
+			syncAnnotation(normalized);
+		}
+	}
+
+	function markAnnotation(annotation, fromSaved) {
+		const range = fromSaved ? findTextRange(article, annotation.selectedText) : state.range;
+		if (!range) return false;
+		return wrapRangeWithMarks(range, annotation);
+	}
+
+	function wrapRangeWithMarks(range, annotation) {
+		const nodes = getTextNodesInRange(range);
+		if (nodes.length === 0) return false;
+
+		for (const item of nodes.reverse()) {
+			const mark = createMark(annotation);
+			const segmentRange = document.createRange();
+			try {
+				segmentRange.setStart(item.node, item.start);
+				segmentRange.setEnd(item.node, item.end);
+				segmentRange.surroundContents(mark);
+			} catch (_error) {
+				continue;
+			}
+		}
+
+		return true;
+	}
+
+	function getTextNodesInRange(range) {
+		const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT, {
+			acceptNode(node) {
+				if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+				if (node.parentElement && node.parentElement.closest(".annotation-inline-disclosure")) {
+					return NodeFilter.FILTER_REJECT;
+				}
+				try {
+					return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+				} catch (_error) {
+					return NodeFilter.FILTER_REJECT;
+				}
+			}
+		});
+		const nodes = [];
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			const length = node.nodeValue ? node.nodeValue.length : 0;
+			let start = node === range.startContainer ? range.startOffset : 0;
+			let end = node === range.endContainer ? range.endOffset : length;
+			start = Math.max(0, Math.min(start, length));
+			end = Math.max(0, Math.min(end, length));
+			if (start < end) {
+				nodes.push({ node, start, end });
+			}
+		}
+		return nodes;
+	}
+
+	function createMark(annotation) {
+		const mark = document.createElement("mark");
+		mark.className = "annotation-mark";
+		mark.dataset.annotationId = annotation.id;
+		if (annotation.note) mark.title = annotation.note;
+		mark.addEventListener("click", () => {
+			if (usesInlineAnnotations()) {
+				toggleInlineAnnotation(annotation.id);
+				return;
+			}
+			openAnnotationEditor(annotation.id);
+		});
+		mark.addEventListener("contextmenu", (event) => {
+			event.preventDefault();
+			removeAnnotation(annotation);
+		});
+		return mark;
+	}
+
+	function usesInlineAnnotations() {
+		return window.matchMedia("(max-width: 1023px)").matches;
+	}
+
+	function findTextRange(root, quote) {
+		const needle = compactText(quote);
+		if (!needle) return null;
+
+		const map = [];
+		let normalized = "";
+		let lastWasSpace = false;
+		const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			if (node.parentElement && node.parentElement.closest(".annotation-inline-disclosure")) {
+				continue;
+			}
+			const value = node.nodeValue || "";
+			for (let index = 0; index < value.length; index += 1) {
+				const character = value[index];
+				if (/\\s/.test(character)) {
+					if (!lastWasSpace) {
+						normalized += " ";
+						map.push({ node, offset: index });
+						lastWasSpace = true;
+					}
+				} else {
+					normalized += character;
+					map.push({ node, offset: index });
+					lastWasSpace = false;
+				}
+			}
+		}
+
+		const startIndex = normalized.indexOf(needle);
+		if (startIndex < 0) return null;
+		const endIndex = startIndex + needle.length - 1;
+		const startPoint = map[startIndex];
+		const endPoint = map[endIndex];
+		if (!startPoint || !endPoint) return null;
+
+		const range = document.createRange();
+		range.setStart(startPoint.node, startPoint.offset);
+		range.setEnd(endPoint.node, endPoint.offset + 1);
+		return range;
+	}
+
+	function renderAnnotationCard(annotation, index, marked) {
+		const list = panel.querySelector(".annotation-list");
+		if (!list) return;
+
+		const card = document.createElement("div");
+		card.tabIndex = 0;
+		card.className = "annotation-card";
+		card.classList.toggle("has-note", Boolean(annotation.note));
+		card.dataset.annotationId = annotation.id;
+		card.addEventListener("click", (event) => {
+			const target = event.target;
+			if (target instanceof Element && target.closest("textarea, button")) return;
+			openAnnotationEditor(annotation.id);
+		});
+		card.addEventListener("keydown", (event) => {
+			const target = event.target;
+			if (target instanceof Element && target.closest("textarea, button")) return;
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				openAnnotationEditor(annotation.id);
+			}
+		});
+		card.addEventListener("contextmenu", (event) => {
+			event.preventDefault();
+			removeAnnotation(annotation);
+		});
+
+		const number = document.createElement("span");
+		number.className = "annotation-number";
+		number.textContent = String(index);
+
+		const quote = document.createElement("p");
+		quote.className = "annotation-quote";
+		quote.textContent = annotation.selectedText;
+
+		const body = document.createElement("div");
+		body.className = "annotation-card-body";
+
+		const note = document.createElement("p");
+		note.className = "annotation-note";
+		note.textContent = annotation.note;
+		note.hidden = !annotation.note;
+
+		const editor = document.createElement("div");
+		editor.className = "annotation-card-editor";
+		editor.hidden = true;
+
+		const textarea = document.createElement("textarea");
+		textarea.rows = 3;
+		textarea.placeholder = text.annotationCardPlaceholder;
+		textarea.setAttribute("aria-label", text.annotationCardPlaceholder);
+		textarea.value = annotation.note;
+
+		const save = document.createElement("button");
+		save.type = "button";
+		save.className = "annotation-card-save";
+		save.textContent = text.annotationComposerSave;
+		save.addEventListener("click", () => {
+			annotation.note = compactText(textarea.value);
+			note.textContent = annotation.note;
+			note.hidden = !annotation.note;
+			card.classList.toggle("has-note", Boolean(annotation.note));
+			syncAnnotation(annotation);
+			updateMarkTitles(annotation);
+			editor.hidden = true;
+			card.classList.remove("is-editing");
+			scheduleAnnotationLayout();
+		});
+
+		const remove = document.createElement("button");
+		remove.type = "button";
+		remove.className = "annotation-card-delete";
+		remove.textContent = text.annotationDelete;
+		remove.addEventListener("click", () => removeAnnotation(annotation));
+
+		const actions = document.createElement("div");
+		actions.className = "annotation-card-actions";
+		actions.append(remove, save);
+
+		textarea.addEventListener("keydown", (event) => {
+			if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+				event.preventDefault();
+				save.click();
+			}
+			if (event.key === "Escape") {
+				event.preventDefault();
+				cancelAnnotationEditors();
+			}
+		});
+
+		editor.append(textarea, actions);
+		body.append(number, quote, note, editor);
+		card.append(body);
+
+		if ((!config.syncAnnotationsToSource || !annotation.sourcePath) && !marked) {
+			const status = document.createElement("div");
+			status.className = "annotation-status";
+			status.textContent = text.annotationSyncDisabled;
+			body.append(status);
+		}
+
+		list.append(card);
+	}
+
+	function renderInlineAnnotation(annotation, index, marked) {
+		if (!marked || !annotation.note) return;
+		if (
+			document.querySelector(
+				'.annotation-inline-disclosure[data-annotation-id="' + cssEscape(annotation.id) + '"]'
+			)
+		) {
+			return;
+		}
+		const marks = Array.from(
+			document.querySelectorAll('.annotation-mark[data-annotation-id="' + cssEscape(annotation.id) + '"]')
+		);
+		const lastMark = marks[marks.length - 1];
+		if (!lastMark) return;
+
+		const disclosure = document.createElement("span");
+		disclosure.className = "annotation-inline-disclosure";
+		disclosure.dataset.annotationId = annotation.id;
+
+		const trigger = document.createElement("button");
+		trigger.type = "button";
+		trigger.className = "annotation-inline-trigger";
+		trigger.setAttribute("aria-expanded", "false");
+		trigger.setAttribute("aria-label", text.annotationPanelTitle + " " + index);
+
+		const icon = document.createElement("span");
+		icon.className = "annotation-inline-icon";
+		icon.setAttribute("aria-hidden", "true");
+
+		const count = document.createElement("span");
+		count.className = "annotation-inline-count";
+		count.textContent = String(index);
+
+		const content = document.createElement("span");
+		content.className = "annotation-inline-content";
+		content.hidden = true;
+
+		const note = document.createElement("span");
+		note.className = "annotation-inline-note";
+		note.textContent = annotation.note;
+		content.append(note);
+
+		trigger.append(icon, count);
+		trigger.addEventListener("click", (event) => {
+			event.preventDefault();
+			toggleInlineAnnotation(annotation.id);
+		});
+		disclosure.append(trigger, content);
+
+		const paragraphEnd = findParagraphEnd(lastMark);
+		if (paragraphEnd && paragraphEnd.node) {
+			const range = document.createRange();
+			range.setStart(paragraphEnd.node, paragraphEnd.offset);
+			range.collapse(true);
+			range.insertNode(disclosure);
+			return;
+		}
+
+		lastMark.insertAdjacentElement("afterend", disclosure);
+	}
+
+	function findParagraphEnd(lastMark) {
+		const block = lastMark.closest("p, li, blockquote");
+		if (!block) return null;
+
+		const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+			acceptNode(node) {
+				return node.parentElement && node.parentElement.closest(".annotation-inline-disclosure")
+					? NodeFilter.FILTER_REJECT
+					: NodeFilter.FILTER_ACCEPT;
+			}
+		});
+		const nodes = [];
+		while (walker.nextNode()) {
+			nodes.push(walker.currentNode);
+		}
+
+		const lastNode = nodes[nodes.length - 1];
+		if (!lastNode || !lastNode.nodeValue) return null;
+		return {
+			node: lastNode,
+			offset: lastNode.nodeValue.length
+		};
+	}
+
+	function toggleInlineAnnotation(annotationId) {
+		const disclosure = document.querySelector(
+			'.annotation-inline-disclosure[data-annotation-id="' + cssEscape(annotationId) + '"]'
+		);
+		if (!disclosure) return;
+		const content = disclosure.querySelector(".annotation-inline-content");
+		const trigger = disclosure.querySelector(".annotation-inline-trigger");
+		if (!content || !trigger) return;
+
+		const shouldOpen = content.hidden;
+		closeInlineAnnotations(disclosure);
+		content.hidden = !shouldOpen;
+		trigger.setAttribute("aria-expanded", String(shouldOpen));
+		if (shouldOpen) {
+			activateAnnotation(annotationId, false);
+		}
+	}
+
+	function closeInlineAnnotations(exceptDisclosure) {
+		document.querySelectorAll(".annotation-inline-content:not([hidden])").forEach((content) => {
+			const disclosure = content.closest(".annotation-inline-disclosure");
+			if (disclosure === exceptDisclosure) return;
+			content.hidden = true;
+			const trigger = disclosure ? disclosure.querySelector(".annotation-inline-trigger") : null;
+			if (trigger) trigger.setAttribute("aria-expanded", "false");
+		});
+	}
+
+	function removeAnnotation(annotation) {
+		hidePopover();
+		removeAnnotationMarks(annotation.id);
+		state.annotations = state.annotations.filter((item) => item.id !== annotation.id);
+		document
+			.querySelectorAll('.annotation-inline-disclosure[data-annotation-id="' + cssEscape(annotation.id) + '"]')
+			.forEach((disclosure) => disclosure.remove());
+		const card = panel.querySelector('.annotation-card[data-annotation-id="' + cssEscape(annotation.id) + '"]');
+		if (card) card.remove();
+		updateAnnotationNumbers();
+		updatePanelVisibility();
+		syncAnnotationDeletion(annotation);
+		scheduleAnnotationLayout();
+	}
+
+	function removeAnnotationMarks(annotationId) {
+		document
+			.querySelectorAll('.annotation-mark[data-annotation-id="' + cssEscape(annotationId) + '"]')
+			.forEach((mark) => {
+				const parent = mark.parentNode;
+				mark.replaceWith(...Array.from(mark.childNodes));
+				if (parent && typeof parent.normalize === "function") {
+					parent.normalize();
+				}
+			});
+	}
+
+	function syncAnnotation(annotation) {
+		if (!config.syncAnnotationsToSource || !annotation.sourcePath || !window.parent || window.parent === window) {
+			return;
+		}
+
+		window.parent.postMessage(
+			{
+				plugin: "notes-to-html-pages",
+				type: "annotation-created",
+				annotation
+			},
+			"*"
+		);
+	}
+
+	function syncAnnotationDeletion(annotation) {
+		if (!config.syncAnnotationsToSource || !annotation.sourcePath || !window.parent || window.parent === window) {
+			return;
+		}
+
+		window.parent.postMessage(
+			{
+				plugin: "notes-to-html-pages",
+				type: "annotation-deleted",
+				annotationId: annotation.id,
+				sourcePath: annotation.sourcePath
+			},
+			"*"
+		);
+	}
+
+	function scheduleAnnotationLayout() {
+		window.requestAnimationFrame(positionAnnotationCards);
+	}
+
+	function positionAnnotationCards() {
+		const cards = Array.from(panel.querySelectorAll(".annotation-card"));
+		if (window.innerWidth < 1024) {
+			cards.forEach((card) => {
+				card.style.top = "";
+			});
+			const list = panel.querySelector(".annotation-list");
+			if (list) list.style.height = "";
+			return;
+		}
+
+		const list = panel.querySelector(".annotation-list");
+		if (!list) return;
+		const cardsWithAnchors = cards
+			.map((card) => {
+				const id = card.dataset.annotationId || "";
+				const mark = document.querySelector('.annotation-mark[data-annotation-id="' + cssEscape(id) + '"]');
+				const fallbackTop = article.getBoundingClientRect().top + window.scrollY;
+				const anchorTop = mark
+					? mark.getBoundingClientRect().top + window.scrollY + 12
+					: Number(card.dataset.annotationTop || fallbackTop);
+				card.dataset.annotationTop = String(anchorTop);
+				return { card, anchorTop };
+			})
+			.sort((first, second) => first.anchorTop - second.anchorTop);
+
+		let nextTop = 0;
+		for (const item of cardsWithAnchors) {
+			const top = Math.max(item.anchorTop, nextTop);
+			item.card.style.top = Math.round(top) + "px";
+			nextTop = top + item.card.offsetHeight + 10;
+		}
+		list.style.height = Math.ceil(nextTop) + "px";
+	}
+
+	function updateMarkTitles(annotation) {
+		document
+			.querySelectorAll('.annotation-mark[data-annotation-id="' + cssEscape(annotation.id) + '"]')
+			.forEach((mark) => {
+				if (annotation.note) {
+					mark.setAttribute("title", annotation.note);
+				} else {
+					mark.removeAttribute("title");
+				}
+			});
+		syncInlineAnnotation(annotation);
+	}
+
+	function syncInlineAnnotation(annotation) {
+		const selector =
+			'.annotation-inline-disclosure[data-annotation-id="' + cssEscape(annotation.id) + '"]';
+		const disclosure = document.querySelector(selector);
+		if (!annotation.note) {
+			if (disclosure) disclosure.remove();
+			return;
+		}
+
+		if (!disclosure) {
+			const index = state.annotations.findIndex((item) => item.id === annotation.id);
+			const hasMark = Boolean(
+				document.querySelector('.annotation-mark[data-annotation-id="' + cssEscape(annotation.id) + '"]')
+			);
+			renderInlineAnnotation(annotation, index + 1, hasMark);
+			return;
+		}
+
+		const inlineNote = disclosure.querySelector(".annotation-inline-note");
+		if (inlineNote) inlineNote.textContent = annotation.note;
+	}
+
+	function updateAnnotationNumbers() {
+		state.annotations.forEach((annotation, index) => {
+			const number = panel.querySelector(
+				'.annotation-card[data-annotation-id="' + cssEscape(annotation.id) + '"] .annotation-number'
+			);
+			if (number) number.textContent = String(index + 1);
+			const count = document.querySelector(
+				'.annotation-inline-disclosure[data-annotation-id="' + cssEscape(annotation.id) + '"] .annotation-inline-count'
+			);
+			if (count) count.textContent = String(index + 1);
+		});
+	}
+
+	function activateAnnotation(id, shouldScroll = true) {
+		const marks = document.querySelectorAll('.annotation-mark[data-annotation-id="' + cssEscape(id) + '"]');
+		document.querySelectorAll(".annotation-card.is-active, .annotation-mark.is-active").forEach((element) => {
+			element.classList.remove("is-active");
+		});
+		const card = document.querySelector('.annotation-card[data-annotation-id="' + cssEscape(id) + '"]');
+		if (card) card.classList.add("is-active");
+		marks.forEach((mark) => mark.classList.add("is-active"));
+		const firstMark = marks[0];
+		if (shouldScroll && firstMark) {
+			firstMark.scrollIntoView({ block: "center", behavior: "smooth" });
+		}
+	}
+
+	function openAnnotationEditor(id) {
+		const card = document.querySelector('.annotation-card[data-annotation-id="' + cssEscape(id) + '"]');
+		if (!card) return;
+		activateAnnotation(id, false);
+		cancelAnnotationEditors(card);
+		const editor = card.querySelector(".annotation-card-editor");
+		const textarea = card.querySelector("textarea");
+		if (editor) editor.hidden = false;
+		card.classList.add("is-editing");
+		if (textarea) {
+			textarea.focus({ preventScroll: true });
+			textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+		}
+		scheduleAnnotationLayout();
+	}
+
+	function cancelAnnotationEditors(exceptCard) {
+		let changed = false;
+		panel.querySelectorAll(".annotation-card.is-editing").forEach((card) => {
+			if (card === exceptCard) return;
+			const editor = card.querySelector(".annotation-card-editor");
+			const textarea = card.querySelector("textarea");
+			const note = card.querySelector(".annotation-note");
+			if (textarea) {
+				textarea.value = note && !note.hidden ? note.textContent || "" : "";
+			}
+			if (editor) editor.hidden = true;
+			card.classList.remove("is-editing");
+			changed = true;
+		});
+		if (changed) scheduleAnnotationLayout();
+	}
+
+	function updatePanelVisibility() {
+		panel.hidden = state.annotations.length === 0;
+	}
+
+	function compactText(value) {
+		return String(value || "").replace(/\\s+/g, " ").trim();
+	}
+
+	function formatDate(value) {
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) return value;
+		const pad = (part) => String(part).padStart(2, "0");
+		return pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + " " + pad(date.getHours()) + ":" + pad(date.getMinutes());
+	}
+
+	function cssEscape(value) {
+		if (window.CSS && typeof window.CSS.escape === "function") {
+			return window.CSS.escape(value);
+		}
+		return String(value).replace(/"/g, "\\\\22 ");
+	}
+
+	function isAnnotation(value) {
+		return (
+			value &&
+			typeof value === "object" &&
+			typeof value.id === "string" &&
+			typeof value.selectedText === "string"
+		);
+	}
+})();
+`.trim();
 
 const CLEAN_HTML_CSS = `
 :root {
@@ -1504,9 +2724,12 @@ html {
 	font-size: 16px;
 	scroll-behavior: smooth;
 	scroll-padding-top: 1.4rem;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
 body {
+	position: relative;
 	margin: 0;
 	color: var(--ink);
 	background: var(--page-bg);
@@ -1542,6 +2765,7 @@ body {
 	line-height: 1.25;
 	letter-spacing: 0;
 	text-align: center;
+	text-wrap: balance;
 }
 
 .article-hero h1 span {
@@ -1555,6 +2779,7 @@ body {
 	font-size: 1rem;
 	font-style: italic;
 	line-height: 1.72;
+	text-wrap: pretty;
 }
 
 .article-deck p {
@@ -1722,6 +2947,7 @@ body {
 	color: #20201d;
 	letter-spacing: 0;
 	line-height: 1.32;
+	text-wrap: balance;
 }
 
 .article-body h2 {
@@ -1767,6 +2993,308 @@ a {
 	color: var(--link);
 	text-decoration-thickness: 1px;
 	text-underline-offset: 0.18em;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.annotation-mark {
+	margin: 0 0.01em;
+	padding: 0.02em 0.08em 0.03em;
+	border-bottom: 1px solid rgba(199, 53, 43, 0.34);
+	background: rgba(199, 53, 43, 0.1);
+	cursor: pointer;
+	transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.annotation-mark:hover,
+.annotation-mark.is-active {
+	background: rgba(199, 53, 43, 0.16);
+	box-shadow: 0 0 0 2px rgba(199, 53, 43, 0.08);
+}
+
+.annotation-inline-disclosure {
+	display: none;
+}
+
+.annotation-popover {
+	position: absolute;
+	z-index: 30;
+	width: min(20rem, calc(100vw - 1.75rem));
+	padding: 0.5rem;
+	border: 1px solid rgba(92, 75, 56, 0.16);
+	border-radius: 10px;
+	background: rgba(255, 252, 246, 0.98);
+	box-shadow: 0 12px 30px rgba(60, 45, 30, 0.14);
+	backdrop-filter: blur(10px);
+}
+
+.annotation-popover::before {
+	content: "";
+	position: absolute;
+	top: -6px;
+	left: 1.2rem;
+	width: 10px;
+	height: 10px;
+	border-top: 1px solid rgba(92, 75, 56, 0.16);
+	border-left: 1px solid rgba(92, 75, 56, 0.16);
+	background: rgba(255, 252, 246, 0.98);
+	transform: rotate(45deg);
+}
+
+.annotation-popover-actions {
+	display: flex;
+	align-items: center;
+	margin-bottom: 0.42rem;
+}
+
+.annotation-popover button,
+.annotation-card button {
+	appearance: none;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: 0.78rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.annotation-underline-button {
+	width: 100%;
+	padding: 0.5rem 0.68rem;
+	border: 1px solid rgba(199, 53, 43, 0.18) !important;
+	background: rgba(199, 53, 43, 0.08) !important;
+	color: var(--accent) !important;
+	font-weight: 700 !important;
+	text-align: center;
+}
+
+.annotation-popover button:hover,
+.annotation-popover button:focus-visible,
+.annotation-card button:hover,
+.annotation-card button:focus-visible {
+	background: var(--accent-soft);
+	color: var(--accent);
+	outline: none;
+}
+
+.annotation-note-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.4rem;
+	align-items: center;
+	padding: 0.28rem;
+	border: 1px solid rgba(216, 209, 198, 0.9);
+	border-radius: 8px;
+	background: rgba(251, 248, 241, 0.92);
+}
+
+.annotation-note-input {
+	width: 100%;
+	min-width: 0;
+	padding: 0.46rem 0.5rem;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: 0.8rem;
+	line-height: 1.2;
+}
+
+.annotation-note-row:focus-within {
+	border-color: rgba(199, 53, 43, 0.44);
+	box-shadow: 0 0 0 2px rgba(199, 53, 43, 0.08);
+}
+
+.annotation-note-input:focus {
+	outline: none;
+}
+
+.annotation-card textarea:focus {
+	border-color: rgba(199, 53, 43, 0.52);
+	outline: 2px solid rgba(199, 53, 43, 0.12);
+}
+
+.annotation-mini-save,
+.annotation-card-save {
+	padding: 0.42rem 0.58rem;
+	border-radius: 6px !important;
+	background: var(--accent) !important;
+	color: #fff !important;
+}
+
+.annotation-panel {
+	position: absolute;
+	top: 0;
+	right: max(1.25rem, calc(50% - 360px - 17rem));
+	width: 15.8rem;
+	z-index: 20;
+	padding-left: 0.8rem;
+	border-left: 1px solid var(--line-soft);
+	overflow: visible;
+}
+
+.annotation-panel-title {
+	display: none;
+}
+
+.annotation-list {
+	position: relative;
+	width: 100%;
+}
+
+.annotation-card {
+	position: absolute;
+	left: 0;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	text-align: left;
+	box-shadow: none;
+	cursor: pointer;
+	transition-property: background-color, box-shadow;
+	transition-duration: 180ms;
+	transition-timing-function: ease-out;
+}
+
+.annotation-card:hover,
+.annotation-card.is-active {
+	background: transparent;
+	box-shadow: none;
+}
+
+.annotation-card.is-editing {
+	background: transparent;
+	box-shadow: none;
+}
+
+.annotation-card-body {
+	position: relative;
+	padding: 0.18rem 0.5rem 0.42rem 1.55rem;
+}
+
+.annotation-number {
+	position: absolute;
+	top: 0.18rem;
+	left: 0.12rem;
+	min-width: 1rem;
+	color: var(--accent);
+	font-size: 0.88rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.annotation-quote,
+.annotation-status {
+	margin: 0;
+}
+
+.annotation-quote {
+	margin: 0;
+	color: #625d54;
+	font-size: 0.78rem;
+	line-height: 1.46;
+	border-left: 2px solid rgba(199, 53, 43, 0.34);
+	background: rgba(199, 53, 43, 0.045);
+	padding: 0.36rem 0.48rem;
+	text-wrap: pretty;
+}
+
+.annotation-note {
+	margin: 0.62rem 0 0;
+	padding: 0;
+	border: 0;
+	color: var(--ink);
+	font-size: 0.86rem;
+	line-height: 1.52;
+	text-wrap: pretty;
+}
+
+.annotation-status {
+	margin-top: 0.45rem;
+	color: var(--muted);
+	font-size: 0.7rem;
+}
+
+.annotation-card-editor {
+	display: grid;
+	gap: 0.42rem;
+	margin-top: 0.86rem;
+	padding-top: 0.74rem;
+	border-top: 1px solid var(--line-soft);
+}
+
+.annotation-card textarea {
+	display: block;
+	width: 100%;
+	resize: vertical;
+	min-height: 4.5rem;
+	padding: 0.58rem 0.62rem;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--paper);
+	color: var(--ink);
+	font: inherit;
+	font-size: 0.78rem;
+	line-height: 1.48;
+}
+
+.annotation-card-save {
+	font-size: 0.72rem !important;
+}
+
+.annotation-card-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.38rem;
+	margin-top: 0.06rem;
+}
+
+.annotation-card-delete,
+.annotation-card-save {
+	min-width: auto;
+	min-height: 2.1rem;
+	padding: 0.36rem 0.58rem !important;
+	font-size: 0.72rem !important;
+	transition-property: background-color, border-color, box-shadow, color, scale;
+	transition-duration: 150ms;
+	transition-timing-function: ease-out;
+}
+
+.annotation-card-delete {
+	border-color: transparent !important;
+	background: transparent !important;
+	color: var(--accent) !important;
+	box-shadow: none !important;
+}
+
+.annotation-card .annotation-card-delete:hover,
+.annotation-card .annotation-card-delete:focus-visible {
+	background: rgba(199, 53, 43, 0.075) !important;
+	color: var(--accent) !important;
+	box-shadow: none !important;
+	outline: none;
+}
+
+.annotation-card .annotation-card-save:hover,
+.annotation-card .annotation-card-save:focus-visible {
+	background: #ae2e26 !important;
+	box-shadow: 0 2px 5px rgba(152, 43, 35, 0.22) !important;
+	outline: none;
+}
+
+.annotation-card-delete:active,
+.annotation-card-save:active {
+	scale: 0.96;
 }
 
 strong {
@@ -1973,24 +3501,157 @@ img {
 	max-width: 100%;
 	height: auto;
 	margin: 1.5rem auto;
+	outline: 1px solid rgba(0, 0, 0, 0.1);
+	outline-offset: -1px;
 }
 
 sup {
 	line-height: 0;
 }
 
-@media (min-width: 1360px) {
+@media (min-width: 1280px) {
 	.side-table-of-contents {
 		display: block;
 		position: fixed;
-		top: 4.6rem;
-		right: max(1.2rem, calc((100vw - 860px) / 2 - 14.8rem));
-		width: 13rem;
+		top: 5rem;
+		left: max(1.25rem, calc(50% - 360px - 14.5rem));
+		right: auto;
+		width: 12.75rem;
 		max-height: calc(100vh - 6rem);
-		padding: 0.85rem 0.95rem;
-		border-left: 1px solid var(--line-soft);
-		background: rgba(243, 240, 232, 0.92);
+		padding: 0.2rem 0.75rem 0.5rem 0;
+		border-right: 1px solid var(--line-soft);
+		border-left: 0;
+		background: transparent;
 		overflow: auto;
+	}
+}
+
+@media (min-width: 1024px) and (max-width: 1179px) {
+	.article-body {
+		max-width: 640px;
+	}
+
+	.annotation-panel {
+		right: max(1rem, calc(50% - 320px - 11.5rem));
+		width: 10.5rem;
+		padding-left: 0.58rem;
+	}
+
+	.annotation-card-body {
+		padding-right: 0.25rem;
+		padding-left: 1.28rem;
+	}
+
+	.annotation-number {
+		left: 0.06rem;
+		font-size: 0.78rem;
+	}
+
+	.annotation-quote {
+		font-size: 0.72rem;
+	}
+
+	.annotation-note {
+		font-size: 0.8rem;
+	}
+}
+
+@media (min-width: 1180px) and (max-width: 1359px) {
+	.article-body {
+		max-width: 680px;
+	}
+
+	.annotation-panel {
+		right: max(1rem, calc(50% - 340px - 13.5rem));
+		width: 12.5rem;
+		padding-left: 0.68rem;
+	}
+}
+
+@media (max-width: 1023px) {
+	.annotation-panel {
+		display: none !important;
+	}
+
+	.annotation-popover {
+		width: min(22rem, calc(100vw - 1.5rem));
+	}
+
+	.annotation-inline-disclosure {
+		display: inline;
+		margin-left: 0.22em;
+		vertical-align: baseline;
+	}
+
+	.annotation-inline-trigger {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.24rem;
+		min-height: 1.3rem;
+		padding: 0.12rem 0.28rem;
+		border: 0;
+		border-radius: 4px;
+		background: rgba(92, 75, 56, 0.055);
+		color: var(--muted);
+		font: inherit;
+		font-size: 0.64rem;
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+		vertical-align: 0.08em;
+		cursor: pointer;
+		transition-property: background-color, color, scale;
+		transition-duration: 150ms;
+		transition-timing-function: ease-out;
+	}
+
+	.annotation-inline-trigger:hover,
+	.annotation-inline-trigger:focus-visible,
+	.annotation-inline-trigger[aria-expanded="true"] {
+		background: rgba(199, 53, 43, 0.09);
+		color: var(--accent);
+		outline: none;
+	}
+
+	.annotation-inline-trigger:active {
+		scale: 0.96;
+	}
+
+	.annotation-inline-icon {
+		position: relative;
+		display: inline-block;
+		width: 0.62rem;
+		height: 0.48rem;
+		border: 1px solid currentColor;
+		border-radius: 2px;
+	}
+
+	.annotation-inline-icon::after {
+		content: "";
+		position: absolute;
+		bottom: -0.17rem;
+		left: 0.12rem;
+		width: 0.2rem;
+		height: 0.2rem;
+		border-bottom: 1px solid currentColor;
+		border-left: 1px solid currentColor;
+		background: transparent;
+		transform: skewY(-36deg);
+	}
+
+	.annotation-inline-content {
+		margin-left: 0.3em;
+		padding: 0.08em 0.34em 0.1em;
+		border-left: 1px solid rgba(199, 53, 43, 0.3);
+		background: rgba(199, 53, 43, 0.038);
+		color: var(--ink);
+		font-size: 0.78rem;
+		line-height: 1.52;
+		text-wrap: pretty;
+		vertical-align: baseline;
+	}
+
+	.annotation-inline-note {
+		margin: 0;
 	}
 }
 
@@ -2044,6 +3705,10 @@ sup {
 	table {
 		font-size: 0.8rem;
 	}
+
+	.annotation-popover {
+		max-width: calc(100vw - 1.5rem);
+	}
 }
 
 @media print {
@@ -2064,6 +3729,11 @@ sup {
 
 	a {
 		color: inherit;
+	}
+
+	.annotation-popover,
+	.annotation-panel {
+		display: none !important;
 	}
 }
 `.trim();
