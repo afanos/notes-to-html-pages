@@ -9,7 +9,7 @@ Turn Obsidian Markdown notes into calm, annotated, offline-readable HTML pages f
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Obsidian](https://img.shields.io/badge/Obsidian-1.5.0%2B-7c3aed.svg)
 ![Platform](https://img.shields.io/badge/platform-Desktop-555.svg)
-![Version](https://img.shields.io/badge/version-0.5.0-green.svg)
+![Version](https://img.shields.io/badge/version-0.6.0-green.svg)
 
 </div>
 
@@ -38,7 +38,7 @@ Each exported `.html` is standalone: it uses inline CSS and optional embedded lo
 ## Features
 
 - **Standalone HTML export**: export the current note or a folder as `.html`. Styling and optional local images are embedded so the page works offline.
-- **Long-form reading layout**: narrow text column, serif typography, clear heading hierarchy, introductions, tables, quotes, callouts, conclusion cards, code blocks, and ASCII diagrams.
+- **Long-form reading layouts**: choose between the Clean and Claude styles, both with a narrow text column, clear heading hierarchy, introductions, tables, quotes, callouts, conclusion cards, code blocks, and ASCII diagrams.
 - **Two levels of navigation**: a clickable table of contents at the beginning of the page, plus a scroll-following section navigator on the left on wide screens.
 - **Read HTML inside Obsidian**: exported `.html` files appear in the file explorer and open directly in the app.
 - **Selected-text underlines and notes**: select text of any length, including across lines and paragraphs, underline it, and add a reading note.

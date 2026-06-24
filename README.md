@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Obsidian](https://img.shields.io/badge/Obsidian-1.5.0%2B-7c3aed.svg)
 ![Platform](https://img.shields.io/badge/platform-Desktop-555.svg)
-![Version](https://img.shields.io/badge/version-0.5.0-green.svg)
+![Version](https://img.shields.io/badge/version-0.6.0-green.svg)
 
 </div>
 
@@ -41,7 +41,7 @@
 ## 功能特性
 
 - **自包含 HTML 导出**：导出当前笔记或整个文件夹为 `.html`。样式和可选的本地图片都写入页面，离线也能打开。
-- **为长文设计的排版**：窄栏正文、衬线字体、清晰标题层级、引言、表格、引用块、重点提示、结论卡片，以及代码和 ASCII 图块。
+- **为长文设计的排版**：提供「简洁」与「Claude 风格」两套阅读样式；均支持窄栏正文、清晰标题层级、引言、表格、引用块、重点提示、结论卡片，以及代码和 ASCII 图块。
 - **双重目录导航**：文章开头自动生成可点击目录；宽屏阅读时，左侧还会出现跟随滚动的章节目录。
 - **在 Obsidian 内直接阅读 HTML**：导出的 `.html` 会出现在文件列表中，点击即可在应用内打开，不再需要额外的入口笔记。
 - **选择、划线与批注**：在 Obsidian 内阅读 HTML 时，选中任意长度的文本，包括跨行和跨段文字，即可划线并写下批注。
