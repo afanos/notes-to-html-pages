@@ -15,9 +15,21 @@
 
 ---
 
-> **In English:** Notes to HTML Pages is an Obsidian plugin that turns Markdown notes into clean, standalone HTML reading pages. It includes a table of contents, in-app HTML reading, and selected-text annotations that can sync back to the source Markdown note. Full documentation: [README.en.md](README.en.md).
+## English Overview
 
-## 简介
+**Notes to HTML Pages** is an Obsidian plugin that turns Markdown notes into clean, standalone HTML pages for long-form reading. Exported pages work offline, open directly inside Obsidian, and can be annotated while you read.
+
+**Key capabilities**
+
+- Export one note or a folder as self-contained HTML with no network dependency.
+- Read with a clickable table of contents, responsive navigation, readable tables, callouts, code blocks, and ASCII diagrams.
+- Choose between the Clean and Claude reading styles.
+- Select text to underline it and add notes; annotations can sync back to the source Markdown note.
+- Open exported `.html` files directly from the Obsidian file explorer.
+
+For full English installation and usage instructions, see [README.en.md](README.en.md).
+
+## 中文介绍
 
 **Notes to HTML Pages** 是一个面向长文阅读的 Obsidian 插件。它**把本地 Markdown 笔记转换成清晰、素净、有目录的 HTML 页面**，让调研、复盘、年度总结和深度文章更像一篇真正可读的文章或小册子。
 
