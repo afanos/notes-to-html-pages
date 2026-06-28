@@ -9,7 +9,7 @@ Turn Obsidian Markdown notes into calm, annotated, offline-readable HTML pages f
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Obsidian](https://img.shields.io/badge/Obsidian-1.5.0%2B-7c3aed.svg)
 ![Platform](https://img.shields.io/badge/platform-Desktop-555.svg)
-![Version](https://img.shields.io/badge/version-0.6.0-green.svg)
+![Version](https://img.shields.io/badge/version-0.7.0-green.svg)
 
 </div>
 
@@ -39,12 +39,14 @@ Each exported `.html` is standalone: it uses inline CSS and optional embedded lo
 
 - **Standalone HTML export**: export the current note or a folder as `.html`. Styling and optional local images are embedded so the page works offline.
 - **Long-form reading layouts**: choose between the Clean and Claude styles, both with a narrow text column, clear heading hierarchy, introductions, tables, quotes, callouts, conclusion cards, code blocks, and ASCII diagrams.
+- **Custom reading font and text size**: enter the name of any font installed on your computer (for example "LXGW WenKai") and pick a text size from small, default, large, or extra large. Exported pages use your local font, with no network dependency.
 - **Two levels of navigation**: a clickable table of contents at the beginning of the page, plus a scroll-following section navigator on the left on wide screens.
 - **Read HTML inside Obsidian**: exported `.html` files appear in the file explorer and open directly in the app.
 - **Selected-text underlines and notes**: select text of any length, including across lines and paragraphs, underline it, and add a reading note.
 - **Responsive annotation layout**: on wider screens, notes sit in the right margin beside the relevant passage. On narrower screens, a small note trigger appears at the end of the annotated paragraph and expands inline. Underlines without a note do not create a numbered trigger.
 - **Sync annotations back to Markdown**: enabled by default. The quoted text, note, and timestamp are written to the source Markdown note and restored on re-export. When disabled, browser reading still supports temporary marking without changing the source note.
 - **Edit and delete annotations**: click a note to edit it. Saving updates the source note; deleting removes the note and its underline from both places.
+- **Copy all highlights**: a quiet button in the bottom-right corner of the reading page copies every highlight on the page — quoted text and notes — to the clipboard in one click.
 - **Keep your note structure**: preserve folder hierarchy, convert Wikilinks to same-name HTML links, and embed local images when desired.
 - **Source-note backlink**: optionally maintain a clean link to the generated reading page at the top of the source note.
 - **Bilingual interface**: commands, context menus, settings, and notices can switch between Chinese and English. The current release is desktop-first.
@@ -86,7 +88,7 @@ You can also right-click a Markdown file or folder in the file explorer and use 
 HTML Pages/
 ```
 
-The settings page lets you change the export folder, folder preservation, Wikilink conversion, image embedding, in-app HTML reading, source-note backlinks, and annotation sync.
+The settings page lets you change the reading style (Clean / Claude), the custom body font, the body text size, the export folder, folder preservation, Wikilink conversion, image embedding, in-app HTML reading, source-note backlinks, and annotation sync.
 
 ### Annotate while reading
 

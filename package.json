@@ -1,6 +1,6 @@
 {
 	"name": "notes-to-html-pages",
-	"version": "0.6.0",
+	"version": "0.7.0",
 	"description": "Export Markdown notes into clean, readable HTML pages with table of contents and in-app reading.",
 	"main": "main.js",
 	"scripts": {

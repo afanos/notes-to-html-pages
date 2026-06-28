@@ -18,7 +18,16 @@ import {
 const VIEW_TYPE_READABLE_HTML = "notes-to-html-pages-html-view";
 
 type HtmlStylePreset = "clean" | "claude";
+type FontScaleOption = "small" | "default" | "large" | "xlarge";
 type UiLanguage = "zh" | "en";
+
+const CUSTOM_FONT_FALLBACK = '"Noto Serif SC", "Songti SC", serif';
+const FONT_SCALE_PX: Record<FontScaleOption, number> = {
+	small: 15,
+	default: 16,
+	large: 18,
+	xlarge: 20
+};
 
 const HTML_STYLE_OPTIONS: Record<HtmlStylePreset, Record<UiLanguage, string>> = {
 	clean: {
@@ -64,6 +73,21 @@ const UI_TEXT: Record<UiLanguage, Record<string, string>> = {
 		settingExportFolderDesc: "相对于当前 vault 根目录。",
 		settingStyleName: "HTML 样式",
 		settingStyleDesc: "控制导出的 HTML 页面版式。后续新增样式会出现在这里。",
+		settingWebFontName: "自定义正文字体",
+		settingWebFontDesc: "填入电脑里已安装的字体名（例如 霞鹜文楷 / LXGW WenKai）。留空则用样式默认字体。",
+		settingCustomFontPlaceholder: "例如：霞鹜文楷",
+		settingFontSizeName: "正文字号",
+		settingFontSizeDesc: "调整导出页面的整体阅读字号。",
+		fontSizeSmall: "偏小",
+		fontSizeDefault: "默认",
+		fontSizeLarge: "偏大",
+		fontSizeXLarge: "特大",
+		controlsAriaLabel: "阅读工具",
+		controlsCopyHighlights: "复制所有划线",
+		controlsCopied: "已复制 {count} 条",
+		controlsCopyEmpty: "暂无划线",
+		controlsCopyFailed: "复制失败",
+		controlsNoteLabel: "备注",
 		settingPreserveFoldersName: "保留原文件夹层级",
 		settingPreserveFoldersDesc: "开启后，导出的 HTML 会在导出目录里复刻原笔记的文件夹路径。",
 		settingAddTitleName: "没有 H1 时用文件名补标题",
@@ -127,6 +151,21 @@ const UI_TEXT: Record<UiLanguage, Record<string, string>> = {
 		settingExportFolderDesc: "Relative to the current vault root.",
 		settingStyleName: "HTML style",
 		settingStyleDesc: "Controls the exported HTML page layout. Future styles will appear here.",
+		settingWebFontName: "Custom body font",
+		settingWebFontDesc: "Enter a font installed on your computer (e.g. LXGW WenKai). Leave empty to use the style default.",
+		settingCustomFontPlaceholder: "e.g. LXGW WenKai",
+		settingFontSizeName: "Body text size",
+		settingFontSizeDesc: "Adjusts the overall reading size of exported pages.",
+		fontSizeSmall: "Small",
+		fontSizeDefault: "Default",
+		fontSizeLarge: "Large",
+		fontSizeXLarge: "Extra large",
+		controlsAriaLabel: "Reading tools",
+		controlsCopyHighlights: "Copy highlights",
+		controlsCopied: "Copied {count}",
+		controlsCopyEmpty: "No highlights yet",
+		controlsCopyFailed: "Copy failed",
+		controlsNoteLabel: "Note",
 		settingPreserveFoldersName: "Preserve folder structure",
 		settingPreserveFoldersDesc: "Exports HTML pages into matching subfolders inside the export folder.",
 		settingAddTitleName: "Use filename as title when H1 is missing",
@@ -164,6 +203,8 @@ interface ReadableHtmlSettings {
 	interfaceLanguage: UiLanguage;
 	exportFolder: string;
 	stylePreset: HtmlStylePreset;
+	customFontFamily: string;
+	fontScale: FontScaleOption;
 	preserveFolderStructure: boolean;
 	addTitleFromFilename: boolean;
 	linkWikilinksToHtml: boolean;
@@ -178,6 +219,8 @@ const DEFAULT_SETTINGS: ReadableHtmlSettings = {
 	interfaceLanguage: "zh",
 	exportFolder: "HTML Pages",
 	stylePreset: "clean",
+	customFontFamily: "",
+	fontScale: "default",
 	preserveFolderStructure: true,
 	addTitleFromFilename: true,
 	linkWikilinksToHtml: true,
@@ -328,6 +371,17 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		}
 		if (data.stylePreset === "clean" || data.stylePreset === "claude") {
 			settings.stylePreset = data.stylePreset;
+		}
+		if (typeof data.customFontFamily === "string") {
+			settings.customFontFamily = data.customFontFamily;
+		}
+		if (
+			data.fontScale === "small" ||
+			data.fontScale === "default" ||
+			data.fontScale === "large" ||
+			data.fontScale === "xlarge"
+		) {
+			settings.fontScale = data.fontScale;
 		}
 		if (typeof data.preserveFolderStructure === "boolean") {
 			settings.preserveFolderStructure = data.preserveFolderStructure;
@@ -527,6 +581,8 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 		const lang = documentLanguage === "zh" ? "zh-CN" : "en";
 		const annotationConfig = this.createAnnotationConfig(file, documentLanguage);
 		const annotationData = this.createAnnotationDataScript(annotations);
+		const overrideCss = this.buildExportOverrideCss(this.settings.customFontFamily, this.settings.fontScale);
+		const readerControls = this.createReaderControls(documentLanguage);
 
 		return {
 			title,
@@ -541,18 +597,58 @@ export default class ReadableHtmlExporterPlugin extends Plugin {
 			`<meta name="notes-to-html-pages-sync-annotations" content="${this.settings.syncAnnotationsToSource ? "true" : "false"}">`,
 			`<title>${this.escapeHtml(title)}</title>`,
 			`<style>${this.getStyleCss(stylePreset)}</style>`,
+			`<style>${READER_CONTROLS_CSS}</style>`,
+			overrideCss ? `<style>${overrideCss}</style>` : "",
 			"</head>",
 			`<body class="style-${stylePreset}">`,
 			'<main class="page">',
 			body,
 			"</main>",
+			readerControls,
 			annotationConfig,
 			annotationData,
 			`<script>${ANNOTATION_SCRIPT}</script>`,
+			`<script>${READER_CONTROLS_SCRIPT}</script>`,
 			"</body>",
 			"</html>"
-			].join("\n")
+			].filter(Boolean).join("\n")
 		};
+	}
+
+	private createReaderControls(documentLanguage: UiLanguage): string {
+		const t = (key: keyof typeof UI_TEXT.zh) => this.escapeHtml(this.tForLanguage(documentLanguage, key));
+
+		return [
+			`<div id="reader-controls" aria-label="${t("controlsAriaLabel")}"`,
+			` data-copied-text="${t("controlsCopied")}"`,
+			` data-empty-text="${t("controlsCopyEmpty")}"`,
+			` data-failed-text="${t("controlsCopyFailed")}"`,
+			` data-note-label="${t("controlsNoteLabel")}">`,
+			'<button type="button" class="reader-control-button reader-control-copy" data-action="copy-highlights"',
+			` title="${t("controlsCopyHighlights")}" aria-label="${t("controlsCopyHighlights")}">`,
+			'<span class="reader-control-glyph" aria-hidden="true">⧉</span>',
+			`<span class="reader-control-label">${t("controlsCopyHighlights")}</span>`,
+			"</button>",
+			"</div>"
+		].join("");
+	}
+
+	private buildExportOverrideCss(customFontFamily: string, fontScale: FontScaleOption): string {
+		const rules: string[] = [];
+		const px = FONT_SCALE_PX[fontScale];
+		if (px && px !== 16) {
+			rules.push(`html{font-size:${px}px;}`);
+		}
+		const family = this.normalizeFontFamily(customFontFamily);
+		if (family) {
+			rules.push(`body{font-family:${family}, ${CUSTOM_FONT_FALLBACK} !important;}`);
+		}
+		return rules.join("");
+	}
+
+	private normalizeFontFamily(input: string): string {
+		const cleaned = (input || "").replace(/["'<>{};\\]/g, "").trim();
+		return cleaned ? `"${cleaned}"` : "";
 	}
 
 	async syncAnnotationToSource(sourcePath: string, annotation: HtmlAnnotation): Promise<void> {
@@ -1808,6 +1904,33 @@ class ReadableHtmlSettingTab extends PluginSettingTab {
 
 				dropdown.setValue(this.plugin.settings.stylePreset).onChange(async (value) => {
 					this.plugin.settings.stylePreset = value as HtmlStylePreset;
+					await this.plugin.saveSettings();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName(this.plugin.t("settingWebFontName"))
+			.setDesc(this.plugin.t("settingWebFontDesc"))
+			.addText((text) => {
+				text
+					.setPlaceholder(this.plugin.t("settingCustomFontPlaceholder"))
+					.setValue(this.plugin.settings.customFontFamily)
+					.onChange(async (value) => {
+						this.plugin.settings.customFontFamily = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName(this.plugin.t("settingFontSizeName"))
+			.setDesc(this.plugin.t("settingFontSizeDesc"))
+			.addDropdown((dropdown) => {
+				dropdown.addOption("small", this.plugin.t("fontSizeSmall"));
+				dropdown.addOption("default", this.plugin.t("fontSizeDefault"));
+				dropdown.addOption("large", this.plugin.t("fontSizeLarge"));
+				dropdown.addOption("xlarge", this.plugin.t("fontSizeXLarge"));
+				dropdown.setValue(this.plugin.settings.fontScale).onChange(async (value) => {
+					this.plugin.settings.fontScale = value as FontScaleOption;
 					await this.plugin.saveSettings();
 				});
 			});
@@ -4828,4 +4951,198 @@ sup {
 		display: none !important;
 	}
 }
+`.trim();
+
+const READER_CONTROLS_CSS = `
+#reader-controls {
+	position: fixed;
+	right: 1.4rem;
+	bottom: 1.4rem;
+	z-index: 40;
+	display: flex;
+	gap: 0.4rem;
+}
+
+.reader-control-button {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.42rem;
+	min-height: 1.9rem;
+	padding: 0.34rem 0.82rem;
+	border: 1px solid var(--line, #d8d1c6);
+	border-radius: 999px;
+	background: var(--paper, #fbf8f1);
+	color: var(--muted, #77736a);
+	font-family: inherit;
+	font-size: 0.8rem;
+	font-weight: 500;
+	line-height: 1;
+	letter-spacing: 0.01em;
+	cursor: pointer;
+	opacity: 0.78;
+	box-shadow: 0 2px 10px rgba(60, 45, 30, 0.07);
+	transition: opacity 180ms ease, color 180ms ease, background-color 180ms ease,
+		border-color 180ms ease, box-shadow 180ms ease, transform 120ms ease;
+}
+
+.reader-control-button:hover,
+.reader-control-button:focus-visible {
+	opacity: 1;
+	color: var(--accent, #c7352b);
+	background: var(--accent-soft, #f8ede9);
+	border-color: var(--accent, #c7352b);
+	box-shadow: 0 5px 18px rgba(60, 45, 30, 0.12);
+	outline: none;
+}
+
+.reader-control-button:active {
+	transform: translateY(1px);
+}
+
+.reader-control-glyph {
+	display: inline-flex;
+	font-size: 0.9rem;
+	line-height: 1;
+	opacity: 0.85;
+}
+
+.reader-control-label {
+	white-space: nowrap;
+}
+
+.reader-control-copy.is-done {
+	opacity: 1;
+	color: #2f7a4b;
+	background: rgba(47, 122, 75, 0.1);
+	border-color: rgba(47, 122, 75, 0.42);
+}
+
+.reader-control-copy.is-empty {
+	opacity: 1;
+	color: var(--muted, #77736a);
+	background: var(--paper, #fbf8f1);
+}
+
+@media (max-width: 1023px) {
+	#reader-controls {
+		right: 0.95rem;
+		bottom: 0.95rem;
+	}
+}
+
+@media (max-width: 600px) {
+	.reader-control-label {
+		display: none;
+	}
+
+	.reader-control-button {
+		min-width: 1.9rem;
+		padding: 0.4rem;
+		justify-content: center;
+	}
+}
+
+@media print {
+	#reader-controls {
+		display: none !important;
+	}
+}
+`.trim();
+
+const READER_CONTROLS_SCRIPT = `
+(() => {
+	"use strict";
+
+	var controls = document.getElementById("reader-controls");
+	if (!controls) return;
+
+	function gatherHighlights() {
+		var seen = {};
+		var order = [];
+		var marks = document.querySelectorAll(".annotation-mark");
+		for (var i = 0; i < marks.length; i++) {
+			var id = marks[i].getAttribute("data-annotation-id") || ("_" + i);
+			if (!Object.prototype.hasOwnProperty.call(seen, id)) { seen[id] = ""; order.push(id); }
+			seen[id] += marks[i].textContent || "";
+		}
+		var notes = {};
+		var cards = document.querySelectorAll(".annotation-card");
+		for (var j = 0; j < cards.length; j++) {
+			var cid = cards[j].getAttribute("data-annotation-id");
+			if (!cid) continue;
+			var noteEl = cards[j].querySelector(".annotation-note");
+			var noteText = noteEl ? (noteEl.textContent || "").trim() : "";
+			if (noteText) notes[cid] = noteText;
+		}
+		var noteLabel = controls.getAttribute("data-note-label") || "Note";
+		var lines = [];
+		for (var k = 0; k < order.length; k++) {
+			var oid = order[k];
+			var quote = (seen[oid] || "").replace(/\\s+/g, " ").trim();
+			if (!quote) continue;
+			var block = (k + 1) + ". " + quote;
+			if (notes[oid]) block += "\\n   " + noteLabel + "： " + notes[oid];
+			lines.push(block);
+		}
+		return lines;
+	}
+
+	function flash(button, cls, message) {
+		var labelEl = button.querySelector(".reader-control-label");
+		var original = labelEl ? labelEl.textContent : null;
+		button.classList.add(cls);
+		if (labelEl && message != null) labelEl.textContent = message;
+		window.setTimeout(function () {
+			button.classList.remove(cls);
+			if (labelEl && original != null) labelEl.textContent = original;
+		}, 1600);
+	}
+
+	function fallbackCopy(text) {
+		try {
+			var ta = document.createElement("textarea");
+			ta.value = text;
+			ta.style.position = "fixed";
+			ta.style.opacity = "0";
+			document.body.appendChild(ta);
+			ta.focus();
+			ta.select();
+			var ok = document.execCommand("copy");
+			document.body.removeChild(ta);
+			return ok;
+		} catch (e) { return false; }
+	}
+
+	function copyText(text) {
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			return navigator.clipboard.writeText(text);
+		}
+		return new Promise(function (resolve, reject) {
+			fallbackCopy(text) ? resolve() : reject(new Error("copy failed"));
+		});
+	}
+
+	function onCopy(button) {
+		var lines = gatherHighlights();
+		if (!lines.length) {
+			flash(button, "is-empty", controls.getAttribute("data-empty-text"));
+			return;
+		}
+		var text = lines.join("\\n\\n");
+		var doneText = (controls.getAttribute("data-copied-text") || "{count}").replace("{count}", String(lines.length));
+		copyText(text).then(function () {
+			flash(button, "is-done", doneText);
+		}).catch(function () {
+			if (fallbackCopy(text)) flash(button, "is-done", doneText);
+			else flash(button, "is-empty", controls.getAttribute("data-failed-text"));
+		});
+	}
+
+	controls.addEventListener("click", function (event) {
+		var target = event.target instanceof Element ? event.target.closest("[data-action]") : null;
+		if (!target) return;
+		if (target.getAttribute("data-action") === "copy-highlights") onCopy(target);
+	});
+})();
 `.trim();

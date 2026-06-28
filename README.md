@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Obsidian](https://img.shields.io/badge/Obsidian-1.5.0%2B-7c3aed.svg)
 ![Platform](https://img.shields.io/badge/platform-Desktop-555.svg)
-![Version](https://img.shields.io/badge/version-0.6.0-green.svg)
+![Version](https://img.shields.io/badge/version-0.7.0-green.svg)
 
 </div>
 
@@ -24,7 +24,9 @@
 - Export one note or a folder as self-contained HTML with no network dependency.
 - Read with a clickable table of contents, responsive navigation, readable tables, callouts, code blocks, and ASCII diagrams.
 - Choose between the Clean and Claude reading styles.
+- Set a custom reading font (any font installed on your computer) and text size.
 - Select text to underline it and add notes; annotations can sync back to the source Markdown note.
+- Copy every highlight on the page to the clipboard with one click.
 - Open exported `.html` files directly from the Obsidian file explorer.
 
 For full English installation and usage instructions, see [README.en.md](README.en.md).
@@ -54,12 +56,14 @@ For full English installation and usage instructions, see [README.en.md](README.
 
 - **自包含 HTML 导出**：导出当前笔记或整个文件夹为 `.html`。样式和可选的本地图片都写入页面，离线也能打开。
 - **为长文设计的排版**：提供「简洁」与「Claude 风格」两套阅读样式；均支持窄栏正文、清晰标题层级、引言、表格、引用块、重点提示、结论卡片，以及代码和 ASCII 图块。
+- **自定义正文字体与字号**：在设置中填入电脑里已安装的字体名（例如「霞鹜文楷 / LXGW WenKai」），并从偏小、默认、偏大、特大中选择正文字号；导出页据此呈现，使用本机字体，无需联网。
 - **双重目录导航**：文章开头自动生成可点击目录；宽屏阅读时，左侧还会出现跟随滚动的章节目录。
 - **在 Obsidian 内直接阅读 HTML**：导出的 `.html` 会出现在文件列表中，点击即可在应用内打开，不再需要额外的入口笔记。
 - **选择、划线与批注**：在 Obsidian 内阅读 HTML 时，选中任意长度的文本，包括跨行和跨段文字，即可划线并写下批注。
 - **贴合阅读宽度的批注呈现**：空间足够时，批注在右侧留白区与原文对应；较窄时，带批注的段落末尾会出现小型批注入口，点击后在正文中展开内容。纯划线不会产生编号入口。
 - **批注同步回 Markdown**：默认开启。批注的原文、备注与时间会写回源 Markdown，重新导出后仍会显示。关闭开关后，浏览器里仍可用于临时划线和备注，但不会改动原文。
 - **可编辑、可删除**：点击批注进入编辑状态；保存更新同步回原文，删除也会同时清除页面与源笔记中的对应批注。
+- **一键复制所有划线**：阅读页右下角有一个与纸面融合的低调按钮，点击即可把本页全部划线原文与备注一次性复制到剪贴板，方便整理读书笔记。
 - **保留笔记结构**：默认保留文件夹层级；可把 Wikilink 转换为同名 HTML 链接，并可内嵌本地图片。
 - **源笔记回链**：可选在源笔记开头维护一个整洁的 HTML 阅读页链接，重复导出不会累积重复内容。
 - **中英文界面**：插件命令、右键菜单、设置与提示支持中文和 English 切换。当前版本优先支持桌面端。
@@ -101,7 +105,7 @@ Notes to HTML Pages: Export current note to HTML page
 HTML Pages/
 ```
 
-设置页可调整导出目录、是否保留文件夹结构、是否转换 Wikilink、是否内嵌图片、是否直接在 Obsidian 打开 HTML、是否在源笔记插入回链，以及批注同步开关。
+设置页可调整阅读样式（简洁 / Claude 风格）、自定义正文字体、正文字号、导出目录、是否保留文件夹结构、是否转换 Wikilink、是否内嵌图片、是否直接在 Obsidian 打开 HTML、是否在源笔记插入回链，以及批注同步开关。
 
 ### 在阅读页中批注
 
